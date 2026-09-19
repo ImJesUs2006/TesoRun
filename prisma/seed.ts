@@ -6,13 +6,14 @@ const CUOTA = 20;
 const DIA = 86_400_000;
 
 // La deuda se calcula en vivo; semanasPagadas define el nivel de cada uno.
+// fechaInicio está 8 semanas atrás -> la semana en curso es la 9.
 const ALUMNOS = [
-  { nombre: "María", semanasPagadas: 8 },
-  { nombre: "Luis", semanasPagadas: 8 },
-  { nombre: "Ana", semanasPagadas: 6 },
-  { nombre: "Carlos", semanasPagadas: 5 },
-  { nombre: "Sofía", semanasPagadas: 4 },
-  { nombre: "Jorge", semanasPagadas: 3 },
+  { nombre: "María", semanasPagadas: 9 },
+  { nombre: "Luis", semanasPagadas: 9 },
+  { nombre: "Ana", semanasPagadas: 7 },
+  { nombre: "Carlos", semanasPagadas: 6 },
+  { nombre: "Sofía", semanasPagadas: 5 },
+  { nombre: "Jorge", semanasPagadas: 4 },
 ];
 
 const NOTAS = [

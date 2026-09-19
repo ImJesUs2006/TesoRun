@@ -14,6 +14,7 @@ type Props = {
   buscados: AlumnoPublico[];
   pagos: Record<string, Date[]>;
   notas: Record<string, NotaTransaccion[]>;
+  fechaInicio?: Date | null;
 };
 
 type EstadoArrastre = {
@@ -21,19 +22,14 @@ type EstadoArrastre = {
   x0: number;
   scroll0: number;
   movio: boolean;
-  id: number | null;
 };
 
-export function CarruselSeBusca({ buscados, pagos, notas }: Props) {
+export function CarruselSeBusca({ buscados, pagos, notas, fechaInicio }: Props) {
   const [seleccionado, setSeleccionado] = useState<AlumnoPublico | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
-  const arrastre = useRef<EstadoArrastre>({ activo: false, x0: 0, scroll0: 0, movio: false, id: null });
+  const arrastre = useRef<EstadoArrastre>({ activo: false, x0: 0, scroll0: 0, movio: false });
   const [puedeIzq, setPuedeIzq] = useState(false);
   const [puedeDer, setPuedeDer] = useState(true);
-
-  useEffect(() => {
-    alDesplazar();
-  }, [buscados.length]);
 
   function alDesplazar() {
     const el = trackRef.current;
@@ -42,11 +38,15 @@ export function CarruselSeBusca({ buscados, pagos, notas }: Props) {
     setPuedeDer(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
   }
 
-  function mover(desplazamiento: number) {
+  useEffect(() => {
+    alDesplazar();
+  }, [buscados.length]);
+
+  function mover(dir: 1 | -1) {
     const el = trackRef.current;
     if (!el) return;
-    alDesplazar();
-    el.scrollBy({ left: desplazamiento, behavior: "smooth" });
+    const paso = Math.max(el.clientWidth * 0.85, 240);
+    el.scrollBy({ left: dir * paso, behavior: "auto" });
   }
 
   function abrir(alumno: AlumnoPublico) {
@@ -54,37 +54,37 @@ export function CarruselSeBusca({ buscados, pagos, notas }: Props) {
     arrastre.current.movio = false;
   }
 
-  function onPointerDown(e: React.PointerEvent) {
+  function iniciarArrastre(e: React.PointerEvent) {
     if (e.pointerType !== "mouse") return; // touch usa el gesto nativo
-    const el = trackRef.current;
-    if (!el) return;
-    arrastre.current = { activo: true, x0: e.clientX, scroll0: el.scrollLeft, movio: false, id: e.pointerId };
-    el.setPointerCapture(e.pointerId);
-  }
+    if (!trackRef.current) return;
+    const cont: HTMLDivElement = trackRef.current;
 
-  function onPointerMove(e: React.PointerEvent) {
-    const s = arrastre.current;
-    const el = trackRef.current;
-    if (!s.activo || !el || e.pointerId !== s.id) return;
-    const dx = e.clientX - s.x0;
-    if (Math.abs(dx) > 6) s.movio = true;
-    el.scrollLeft = s.scroll0 - dx;
-  }
+    const estado: EstadoArrastre = { activo: true, x0: e.clientX, scroll0: cont.scrollLeft, movio: false };
+    arrastre.current = estado;
+    cont.classList.add("cursor-grabbing");
 
-  function onPointerUp(e: React.PointerEvent) {
-    const s = arrastre.current;
-    if (s.activo) {
-      const el = trackRef.current;
-      if (el) {
-        try {
-          el.releasePointerCapture(e.pointerId);
-        } catch {
-          /* ignorar */
-        }
+    function onMove(ev: PointerEvent) {
+      if (!estado.activo) return;
+      const dx = ev.clientX - estado.x0;
+      if (Math.abs(dx) > 5) {
+        estado.movio = true;
+        cont.classList.add("select-none");
       }
+      cont.scrollLeft = estado.scroll0 - dx;
+    }
+
+    function onEnd() {
+      estado.activo = false;
+      cont.classList.remove("cursor-grabbing", "select-none");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
       alDesplazar();
     }
-    s.activo = false;
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
   }
 
   if (buscados.length === 0) return null;
@@ -108,14 +108,11 @@ export function CarruselSeBusca({ buscados, pagos, notas }: Props) {
 
         <div
           ref={trackRef}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
+          onPointerDown={iniciarArrastre}
           onScroll={alDesplazar}
-          className="scroll-sin-barra -mx-1 cursor-grab touch-pan-x overflow-x-auto px-1 pb-4 select-none active:cursor-grabbing"
+          className="scroll-sin-barra -mx-1 cursor-grab touch-pan-x overflow-x-auto px-1 pb-4"
         >
-          <div className="flex w-max snap-x snap-mandatory gap-5">
+          <div className="flex w-max snap-x snap-proximity gap-5">
             {buscados.map((alumno, i) => (
               <div
                 key={alumno.id}
@@ -178,6 +175,7 @@ export function CarruselSeBusca({ buscados, pagos, notas }: Props) {
             alumno={seleccionado}
             pagos={pagos[seleccionado.id] ?? []}
             notas={notas[seleccionado.id] ?? []}
+            fechaInicio={fechaInicio}
             onClose={() => setSeleccionado(null)}
           />
         )}

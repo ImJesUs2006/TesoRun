@@ -2,12 +2,15 @@ import { CUOTA_SEMANAL } from "@/lib/config";
 
 const DIA_MS = 86_400_000;
 
-/** Semanas transcurridas (enteras) entre la fecha de inicio y hoy. */
+/** Semanas transcurridas (enteras) entre la fecha de inicio y hoy.
+ *  La semana en curso cuenta: pones la fecha y esa misma semana ya es signada. */
 export function semanasTranscurridas(fechaInicio: Date | null | undefined): number {
   if (!fechaInicio) return 0;
   const t = fechaInicio.getTime();
   if (!Number.isFinite(t)) return 0;
-  return Math.max(0, Math.floor((Date.now() - t) / (7 * DIA_MS)));
+  const dias = Math.floor((Date.now() - t) / DIA_MS);
+  if (dias < 0) return 0; // la recolección aún no empieza
+  return Math.floor(dias / 7) + 1;
 }
 
 /**

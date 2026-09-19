@@ -17,10 +17,11 @@ type Props = {
   alumno: AlumnoPublico;
   pagos: Date[];
   notas: NotaTransaccion[];
+  fechaInicio?: Date | null;
   onClose: () => void;
 };
 
-export function ModalAlumno({ alumno, pagos, notas, onClose }: Props) {
+export function ModalAlumno({ alumno, pagos, notas, fechaInicio, onClose }: Props) {
   const montoDeuda = alumno.deuda * CUOTA_SEMANAL;
 
   return (
@@ -75,7 +76,7 @@ export function ModalAlumno({ alumno, pagos, notas, onClose }: Props) {
           <h4 className="font-display mb-3 flex items-center gap-2 text-lg uppercase text-black">
             <CalendarDays className="h-5 w-5" /> Calendario de pagos
           </h4>
-          <CalendarioPagos pagos={pagos} />
+          <CalendarioPagos pagos={pagos} fechaInicio={fechaInicio} />
         </div>
 
         <div className="mt-6">

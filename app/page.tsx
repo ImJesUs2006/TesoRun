@@ -138,6 +138,7 @@ export default async function HomePage() {
         heroes={heroes}
         pagos={pagosPorAlumno}
         notas={notasPorAlumno}
+        fechaInicio={inicioRecoleccion}
       />
 
       {morosos.length > 0 ? (
@@ -145,6 +146,7 @@ export default async function HomePage() {
           buscados={morosos}
           pagos={pagosPorAlumno}
           notas={notasPorAlumno}
+          fechaInicio={inicioRecoleccion}
         />
       ) : (
         <section className="flex flex-col items-center gap-3 rounded-xl border-4 border-black bg-white p-8 text-center shadow-[10px_10px_0_0_#000]">
@@ -157,12 +159,14 @@ export default async function HomePage() {
         morosos={morosos}
         pagos={pagosPorAlumno}
         notas={notasPorAlumno}
+        fechaInicio={inicioRecoleccion}
       />
 
       <ListaAlumnos
         alumnos={alumnosConDeuda}
         pagos={pagosPorAlumno}
         notas={notasPorAlumno}
+        fechaInicio={inicioRecoleccion}
       />
 
       <MuroGastos

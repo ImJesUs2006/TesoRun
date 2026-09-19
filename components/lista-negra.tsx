@@ -12,9 +12,10 @@ type Props = {
   morosos: AlumnoPublico[];
   pagos: Record<string, Date[]>;
   notas: Record<string, NotaTransaccion[]>;
+  fechaInicio?: Date | null;
 };
 
-export function ListaNegra({ morosos, pagos, notas }: Props) {
+export function ListaNegra({ morosos, pagos, notas, fechaInicio }: Props) {
   const [seleccionado, setSeleccionado] = useState<AlumnoPublico | null>(null);
 
   return (
@@ -49,6 +50,7 @@ export function ListaNegra({ morosos, pagos, notas }: Props) {
             alumno={seleccionado}
             pagos={pagos[seleccionado.id] ?? []}
             notas={notas[seleccionado.id] ?? []}
+            fechaInicio={fechaInicio}
             onClose={() => setSeleccionado(null)}
           />
         )}

@@ -14,6 +14,7 @@ type Props = {
   heroes: AlumnoPublico[];
   pagos: Record<string, Date[]>;
   notas: Record<string, NotaTransaccion[]>;
+  fechaInicio?: Date | null;
 };
 
 // Orden visual del podio: 2º, 1º, 3º
@@ -23,7 +24,7 @@ const ALTURAS = ["h-24", "h-36", "h-16"] as const;
 const COLORES = ["bg-sky-400", "bg-yellow-400", "bg-emerald-400"] as const;
 const MEDALLAS = ["#cbd5e1", "#facc15", "#d97706"] as const;
 
-export function PodioHeroes({ heroes, pagos, notas }: Props) {
+export function PodioHeroes({ heroes, pagos, notas, fechaInicio }: Props) {
   const [seleccionado, setSeleccionado] = useState<AlumnoPublico | null>(null);
   const top = heroes.slice(0, 3);
   if (top.length === 0) return null;
@@ -90,6 +91,7 @@ export function PodioHeroes({ heroes, pagos, notas }: Props) {
             alumno={seleccionado}
             pagos={pagos[seleccionado.id] ?? []}
             notas={notas[seleccionado.id] ?? []}
+            fechaInicio={fechaInicio}
             onClose={() => setSeleccionado(null)}
           />
         )}

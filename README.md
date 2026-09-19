@@ -5,7 +5,7 @@ Tesorería gamificada para el grupo universitario. Lleva el control de cuotas se
 ## Características
 
 - **Página pública** (`/`): podio de héroes, carrusel "se busca" (deslizable), lista negra, clase completa, muro de gastos y tablón de comentarios con máximo 3 al día por persona.
-- **Deuda calculada en vivo**: se deriva de la fecha de inicio de recolección y las semanas pagadas; cambias la fecha y todo se recalcula solo.
+- **Deuda calculada en vivo**: se deriva de la fecha de inicio de recolección y las semanas pagadas; cambias la fecha y todo se recalcula solo. La semana en curso también cuenta (fecha "hoy" = 1 semana de deuda).
 - **Muro de gastos** público y **reporte Excel** descargable (texto plano con colores, sin fotos).
 - **Panel de tesorero** (`/admin-teso`): alta/baja de alumnos, cobrar +$20 (bloqueado si no hay deuda), deshacer pagos, editar fecha de inicio, gestionar anuncios y comentarios, foto por archivo (Base64).
 - **Login estilizado** con PIN (contraseña), compatible con Basic Auth.
