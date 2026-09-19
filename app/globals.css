@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-display: var(--font-archivo-black), "Arial Black", "Segoe UI", sans-serif;
+}
+
+body {
+  background-color: #fff4d4;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: #111;
+}
+
+::selection {
+  background-color: #fde047;
+  color: #000;
+}
+
+/* <dialog> nativo (modal de detalle) */
+dialog {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.scroll-sin-barra::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-sin-barra {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

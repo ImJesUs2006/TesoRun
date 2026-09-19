@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Alumno {
+  id             String         @id @default(cuid())
+  nombre         String
+  avatarUrl      String?        @db.Text // Base64 largo permitido (foto subida por el admin)
+  semanasPagadas Int            @default(0)
+  rachaActual    Int            @default(0)
+  mejorRacha     Int            @default(0)
+  ultimoPago     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  transacciones  Transaccion[]
+  comentarios    Comentario[]
+}
+
+model Transaccion {
+  id          String   @id @default(cuid())
+  monto       Float
+  tipo        String // "INGRESO" o "GASTO"
+  descripcion String
+  notaAdmin   String? // Nota opcional al registrar pago
+  fecha       DateTime @default(now())
+  alumnoId    String?
+  alumno      Alumno?  @relation(fields: [alumnoId], references: [id], onDelete: SetNull)
+
+  @@index([fecha])
+  @@index([tipo])
+}
+
+model Comentario {
+  id        String   @id @default(cuid())
+  contenido String
+  fecha     DateTime @default(now())
+  alumnoId  String
+  alumno    Alumno   @relation(fields: [alumnoId], references: [id], onDelete: Cascade)
+
+  @@index([fecha])
+}
+
+model Anuncio {
+  id      String   @id @default(cuid())
+  mensaje String
+  activo  Boolean  @default(true)
+  fecha   DateTime @default(now())
+}
+
+// Fila unica (id = 1) con la fecha de inicio oficial de recoleccion.
+model Configuracion {
+  id          Int      @id @default(1)
+  fechaInicio DateTime
+}
