@@ -92,7 +92,7 @@ export function CarruselSeBusca({ buscados, pagos, notas, fechaInicio }: Props) 
   return (
     <section>
       <h2 className="font-display mb-6 flex items-center justify-center gap-2 text-3xl uppercase text-black">
-        <Megaphone className="h-7 w-7" /> Carrusel se busca
+        <Megaphone className="h-7 w-7" /> Si los ve reportelos 
       </h2>
 
       <div className="flex items-center gap-3">
