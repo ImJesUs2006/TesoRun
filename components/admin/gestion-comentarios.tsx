@@ -1,16 +1,21 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { MessageSquare, Trash2 } from "lucide-react";
-import { eliminarComentario } from "@/app/admin-teso/actions";
+import { eliminarComentario, eliminarComentariosMasivo } from "@/app/admin-teso/actions";
 import { reproducirError } from "@/lib/sound";
 import { useToast } from "./toast-provider";
 
 export type ComentarioAdmin = {
   id: string;
-  contenido: string;
+  alias: string;
+  contenido: string | null;
+  gifUrl: string | null;
+  imageUrl: string | null;
+  audioUrl: string | null;
   fecha: Date;
-  alumnoNombre: string;
+  alumnoNombre: string | null;
+  reacciones: Array<{ emoji: string; votantes: string[] }>;
 };
 
 type Props = {
@@ -27,13 +32,47 @@ const formato = new Intl.DateTimeFormat("es-MX", {
 export function GestionComentarios({ comentarios }: Props) {
   const { notificar } = useToast();
   const [pending, startTransition] = useTransition();
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
 
-  function borrar(c: ComentarioAdmin) {
-    if (!window.confirm(`¿Eliminar el comentario de ${c.alumnoNombre}?`)) return;
+  function alternar(id: string) {
+    setSeleccion((prev) => {
+      const copia = new Set(prev);
+      if (copia.has(id)) copia.delete(id);
+      else copia.add(id);
+      return copia;
+    });
+  }
+
+  function todos() {
+    setSeleccion((prev) =>
+      prev.size === comentarios.length
+        ? new Set()
+        : new Set(comentarios.map((c) => c.id)),
+    );
+  }
+
+  function borrarUno(c: ComentarioAdmin) {
+    if (!window.confirm(`¿Eliminar el comentario de ${c.alias}?`)) return;
     startTransition(async () => {
       const res = await eliminarComentario(c.id);
-      if (res.ok) notificar("Comentario eliminado", "info", c.alumnoNombre);
+      if (res.ok) notificar("Comentario eliminado", "info", c.alias);
       else {
+        reproducirError();
+        notificar("No se pudo eliminar", "error", res.error);
+      }
+    });
+  }
+
+  function borrarMasivo() {
+    const ids = Array.from(seleccion);
+    if (ids.length === 0) return;
+    if (!window.confirm(`¿Eliminar ${ids.length} comentario${ids.length === 1 ? "" : "s"}?`)) return;
+    startTransition(async () => {
+      const res = await eliminarComentariosMasivo(ids);
+      if (res.ok) {
+        notificar("Eliminación masiva", "info", `${ids.length} comentario(s) eliminados.`);
+        setSeleccion(new Set());
+      } else {
         reproducirError();
         notificar("No se pudo eliminar", "error", res.error);
       }
@@ -42,9 +81,25 @@ export function GestionComentarios({ comentarios }: Props) {
 
   return (
     <section className="rounded-xl border-4 border-black bg-white p-5 shadow-[8px_8px_0_0_#000]">
-      <h2 className="font-display mb-3 flex items-center gap-2 text-xl uppercase text-black">
-        <MessageSquare className="h-5 w-5" /> Comentarios del tablón
-      </h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display flex items-center gap-2 text-xl uppercase text-black">
+          <MessageSquare className="h-5 w-5" /> Comentarios del muro
+        </h2>
+        <div className="flex items-center gap-2">
+          {comentarios.length > 0 && (
+            <button
+              type="button"
+              onClick={todos}
+              className="rounded-full border-2 border-black bg-yellow-100 px-3 py-1 text-xs font-black text-black transition hover:bg-yellow-200"
+            >
+              {seleccion.size === comentarios.length ? "Limpiar selección" : "Seleccionar todo"}
+            </button>
+          )}
+          <span className="rounded-full border-2 border-black bg-black px-3 py-1 text-xs font-black text-white">
+            {seleccion.size} seleccionados
+          </span>
+        </div>
+      </div>
 
       <ul className="space-y-2">
         {comentarios.length === 0 && (
@@ -54,16 +109,58 @@ export function GestionComentarios({ comentarios }: Props) {
         )}
         {comentarios.map((c) => (
           <li key={c.id} className="rounded-lg border-2 border-black bg-yellow-50 px-3 py-2">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-black">{c.contenido}</p>
-                <p className="text-xs font-bold text-black/50">
-                  {c.alumnoNombre} · {formato.format(new Date(c.fecha))}
+            <div className="flex items-center gap-3">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={seleccion.has(c.id)}
+                  onChange={() => alternar(c.id)}
+                  className="h-5 w-5 rounded border-2 border-black accent-black"
+                />
+                <span className="sr-only">Seleccionar comentario de {c.alias}</span>
+              </label>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-black">
+                  {c.contenido ||
+                    (c.gifUrl ? "🧩 (GIF adjunto)" : c.imageUrl ? "🖼 (Imagen adjunta)" : c.audioUrl ? "🎙 Nota de voz" : "")}
                 </p>
+                <p className="truncate text-xs font-bold text-black/50">
+                  {c.alias}{c.alumnoNombre ? ` · ex: ${c.alumnoNombre}` : ""} · {formato.format(new Date(c.fecha))}
+                </p>
+                {(c.gifUrl || c.imageUrl || c.audioUrl) && (
+                  <p className="mt-1 flex flex-wrap items-center gap-2">
+                    {c.gifUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={c.gifUrl} alt="" className="h-9 w-9 rounded border-2 border-black object-cover" />
+                    )}
+                    {c.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={c.imageUrl} alt="" className="h-9 w-9 rounded border-2 border-black object-cover" />
+                    )}
+                    {c.audioUrl && (
+                      <audio controls preload="metadata" src={c.audioUrl} className="h-8 max-w-[180px]" />
+                    )}
+                  </p>
+                )}
+                {c.reacciones.length > 0 && (
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {c.reacciones.map((r) => (
+                      <span
+                        key={r.emoji}
+                        className="inline-flex items-center gap-1 rounded-full border-2 border-black bg-white px-1.5 py-0.5 text-[11px] font-black text-black"
+                        title={`${r.votantes.length} persona${r.votantes.length === 1 ? "" : "s"}`}
+                      >
+                        {r.emoji} {r.votantes.length}
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
+
               <button
                 type="button"
-                onClick={() => borrar(c)}
+                onClick={() => borrarUno(c)}
                 disabled={pending}
                 title="Eliminar comentario"
                 className="shrink-0 rounded-full border-2 border-black bg-white p-2 shadow-[3px_3px_0_0_#000] transition hover:bg-red-100 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
@@ -74,6 +171,17 @@ export function GestionComentarios({ comentarios }: Props) {
           </li>
         ))}
       </ul>
+
+      {seleccion.size > 0 && (
+        <button
+          type="button"
+          onClick={borrarMasivo}
+          disabled={pending}
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border-4 border-black bg-red-500 px-5 py-3 font-display text-white shadow-[6px_6px_0_0_#000] transition hover:-translate-y-0.5 hover:bg-red-400 active:translate-x-1 active:translate-y-1 active:shadow-none"
+        >
+          <Trash2 className="h-5 w-5" /> Eliminar {seleccion.size} seleccionados
+        </button>
+      )}
     </section>
   );
 }

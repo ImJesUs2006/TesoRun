@@ -40,6 +40,10 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // 2.5) Anti-timing: si llegaron credenciales y fallaron, retarda la respuesta
+  // para no revelar diferencias de validación (longitud/contenido).
+  if (header) await new Promise((r) => setTimeout(r, 200));
+
   // 3) Redirige a la página de login estilizada.
   const url = req.nextUrl.clone();
   url.pathname = "/login";
@@ -50,5 +54,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin-teso/:path*"],
+  matcher: ["/admin-teso/:path*", "/api/reporte-excel/:path*"],
 };

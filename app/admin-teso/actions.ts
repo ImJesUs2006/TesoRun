@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { CUOTA_SEMANAL } from "@/lib/config";
 import { calcularDeuda } from "@/lib/deuda";
-
-export type Resultado = { ok: true } | { ok: false; error: string };
+import { esAdminSesion } from "@/lib/admin-guard";
+import { esquemaIds, esquemaEncuesta, esquemaConfiguracion, primeraInvalidez } from "@/lib/seguridad";
+import { destruirArchivoCloudinary } from "@/lib/cloudinary-server";
+import type { Resultado } from "@/lib/tipos";
 
 const DIA_MS = 86_400_000;
 
@@ -14,12 +16,20 @@ function refrescar() {
   revalidatePath("/admin-teso");
 }
 
+/** Guard para TODAS las Server Actions del panel: sin cookie de admin, out. */
+async function exigeAdmin(): Promise<null | { ok: false; error: string }> {
+  return (await esAdminSesion()) ? null : { ok: false, error: "No autorizado." };
+}
+
 /**
  * Registra el pago de la cuota semanal de $20 de un alumno.
  * Incrementa semanasPagadas (la deuda baja sola por la formula en vivo),
  * mantiene la racha, guarda la notaAdmin opcional y crea el INGRESO.
  */
 export async function registrarPago(alumnoId: string, notaAdmin?: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const [alumno, config] = await Promise.all([
     prisma.alumno.findUnique({
       where: { id: alumnoId },
@@ -74,6 +84,9 @@ export async function registrarPago(alumnoId: string, notaAdmin?: string): Promi
  * Deshace el ultimo pago registrado del alumno.
  */
 export async function deshacerPago(alumnoId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const ultimo = await prisma.transaccion.findFirst({
     where: { alumnoId, tipo: "INGRESO" },
     orderBy: { fecha: "desc" },
@@ -109,6 +122,9 @@ export async function actualizarAlumno(
   alumnoId: string,
   datos: { nombre?: string; avatarUrl?: string },
 ): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const nombre = datos.nombre?.trim();
   if (nombre === "") return { ok: false, error: "El nombre no puede estar vacío." };
 
@@ -130,6 +146,9 @@ export async function actualizarAlumno(
  * Da de alta a un compañero nuevo.
  */
 export async function crearAlumno(datos: { nombre: string; avatarUrl?: string }): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const nombre = datos.nombre.trim();
   if (!nombre) return { ok: false, error: "El nombre es obligatorio." };
 
@@ -147,6 +166,9 @@ export async function crearAlumno(datos: { nombre: string; avatarUrl?: string })
  * Da de baja a un alumno. Su historial se conserva (alumnoId -> null).
  */
 export async function eliminarAlumno(alumnoId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const existe = await prisma.alumno.findUnique({ where: { id: alumnoId }, select: { id: true } });
   if (!existe) return { ok: false, error: "Alumno no encontrado." };
 
@@ -160,6 +182,9 @@ export async function eliminarAlumno(alumnoId: string): Promise<Resultado> {
  * Registra un gasto de la tesoreria.
  */
 export async function registrarGasto(monto: number, descripcion: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const montoLimpio = Number(monto);
   if (!Number.isFinite(montoLimpio) || montoLimpio <= 0) {
     return { ok: false, error: "El monto debe ser mayor a $0." };
@@ -177,51 +202,22 @@ export async function registrarGasto(monto: number, descripcion: string): Promis
 }
 
 /**
- * Publica un comentario en el tablon publico.
- * Sin PIN: el alumno solo se selecciona. Limite de 3 comentarios por dia por alumno.
- */
-export async function publicarComentario(datos: {
-  alumnoId: string;
-  contenido: string;
-}): Promise<Resultado> {
-  const contenido = datos.contenido.trim();
-  if (!contenido) return { ok: false, error: "Escribe un mensaje antes de publicar." };
-  if (contenido.length > 280) return { ok: false, error: "Máximo 280 caracteres." };
-  if (!datos.alumnoId) return { ok: false, error: "Selecciona tu nombre." };
-
-  const alumno = await prisma.alumno.findUnique({
-    where: { id: datos.alumnoId },
-    select: { id: true },
-  });
-  if (!alumno) return { ok: false, error: "Selecciona tu nombre." };
-
-  const inicioHoy = new Date();
-  inicioHoy.setHours(0, 0, 0, 0);
-
-  const hoy = await prisma.comentario.count({
-    where: { alumnoId: datos.alumnoId, fecha: { gte: inicioHoy } },
-  });
-  if (hoy >= 3) {
-    return { ok: false, error: "Límite alcanzado: máximo 3 comentarios por día." };
-  }
-
-  await prisma.comentario.create({
-    data: { alumnoId: datos.alumnoId, contenido },
-  });
-
-  refrescar();
-  return { ok: true };
-}
-
-/**
- * Elimina un comentario (basura visible en el panel del tesorero).
+ * Publica un comentario anónimo en el muro (API pública en app/acciones-publicas.ts).
+ * Esta versión per-alumno quedó fuera; la anónima tiene alias + GIF + audio.
  */
 export async function eliminarComentario(comentarioId: string): Promise<Resultado> {
-  const existe = await prisma.comentario.findUnique({
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const comentario = await prisma.comentario.findUnique({
     where: { id: comentarioId },
-    select: { id: true },
+    select: { id: true, imageUrl: true, audioUrl: true },
   });
-  if (!existe) return { ok: false, error: "Comentario no encontrado." };
+  if (!comentario) return { ok: false, error: "Comentario no encontrado." };
+
+  // Limpiar los archivos físicos en Cloudinary ANTES de borrar el registro.
+  if (comentario.imageUrl) await destruirArchivoCloudinary(comentario.imageUrl);
+  if (comentario.audioUrl) await destruirArchivoCloudinary(comentario.audioUrl);
 
   await prisma.comentario.delete({ where: { id: comentarioId } });
 
@@ -233,6 +229,9 @@ export async function eliminarComentario(comentarioId: string): Promise<Resultad
  * Crea un anuncio para el tablon publico.
  */
 export async function crearAnuncio(mensaje: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const limpio = mensaje.trim();
   if (!limpio) return { ok: false, error: "Escribe el aviso." };
 
@@ -246,6 +245,9 @@ export async function crearAnuncio(mensaje: string): Promise<Resultado> {
  * Muestra/oculta un anuncio del tablon publico.
  */
 export async function alternarAnuncio(anuncioId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const anuncio = await prisma.anuncio.findUnique({
     where: { id: anuncioId },
     select: { id: true, activo: true },
@@ -265,6 +267,9 @@ export async function alternarAnuncio(anuncioId: string): Promise<Resultado> {
  * Edita el texto de un anuncio existente.
  */
 export async function actualizarAnuncio(anuncioId: string, mensaje: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const limpio = mensaje.trim();
   if (!limpio) return { ok: false, error: "El aviso no puede quedar vacío." };
 
@@ -281,6 +286,9 @@ export async function actualizarAnuncio(anuncioId: string, mensaje: string): Pro
  * Elimina un anuncio del tablon publico.
  */
 export async function eliminarAnuncio(anuncioId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const existe = await prisma.anuncio.findUnique({ where: { id: anuncioId }, select: { id: true } });
   if (!existe) return { ok: false, error: "Anuncio no encontrado." };
 
@@ -339,6 +347,9 @@ async function recalcularHistorial(alumnoId: string) {
  * correspondiente y recalcula las rachas del alumno.
  */
 export async function eliminarTransaccion(transaccionId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const t = await prisma.transaccion.findUnique({ where: { id: transaccionId } });
   if (!t) return { ok: false, error: "Transacción no encontrada." };
 
@@ -365,6 +376,9 @@ export async function eliminarTransaccion(transaccionId: string): Promise<Result
  * Actualiza la fecha de inicio oficial de recoleccion (fila unica de Configuracion).
  */
 export async function actualizarFechaInicio(fechaIso: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
   const fecha = fechaIso ? new Date(fechaIso) : null;
   if (!fecha || Number.isNaN(fecha.getTime())) {
     return { ok: false, error: "Fecha inválida." };
@@ -375,6 +389,174 @@ export async function actualizarFechaInicio(fechaIso: string): Promise<Resultado
     update: { fechaInicio: fecha },
     create: { id: 1, fechaInicio: fecha },
   });
+
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Eliminación masiva de comentarios del muro (selección múltiple del admin).
+ */
+export async function eliminarComentariosMasivo(ids: unknown): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const parse = esquemaIds.safeParse(ids);
+  if (!parse.success || parse.data.length === 0) {
+    return { ok: false, error: "Selecciona al menos un comentario." };
+  }
+
+  // Limpiar archivos físicos de Cloudinary de todos los seleccionados.
+  const comentarios = await prisma.comentario.findMany({
+    where: { id: { in: parse.data } },
+    select: { imageUrl: true, audioUrl: true },
+  });
+  await Promise.all(
+    comentarios.flatMap((c) =>
+      [c.imageUrl, c.audioUrl].filter((u): u is string => !!u).map(destruirArchivoCloudinary),
+    ),
+  );
+
+  const { count } = await prisma.comentario.deleteMany({ where: { id: { in: parse.data } } });
+  refrescar();
+  if (count === 0) return { ok: false, error: "No se eliminó ningún comentario." };
+  return { ok: true };
+}
+
+/**
+ * Marca una sugerencia como leída / no leída.
+ */
+export async function alternarSugerenciaLeida(sugerenciaId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const sugerencia = await prisma.sugerencia.findUnique({
+    where: { id: sugerenciaId },
+    select: { id: true, leida: true },
+  });
+  if (!sugerencia) return { ok: false, error: "Sugerencia no encontrada." };
+
+  await prisma.sugerencia.update({
+    where: { id: sugerenciaId },
+    data: { leida: !sugerencia.leida },
+  });
+
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Eliminación masiva de sugerencias del buzón.
+ */
+export async function eliminarSugerenciasMasivo(ids: unknown): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const parse = esquemaIds.safeParse(ids);
+  if (!parse.success || parse.data.length === 0) {
+    return { ok: false, error: "Selecciona al menos una sugerencia." };
+  }
+
+  await prisma.sugerencia.deleteMany({ where: { id: { in: parse.data } } });
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Elimina una sugerencia individual.
+ */
+export async function eliminarSugerencia(sugerenciaId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const existe = await prisma.sugerencia.findUnique({ where: { id: sugerenciaId }, select: { id: true } });
+  if (!existe) return { ok: false, error: "Sugerencia no encontrada." };
+
+  await prisma.sugerencia.delete({ where: { id: sugerenciaId } });
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Crea una encuesta con sus opciones.
+ */
+export async function crearEncuesta(datos: unknown): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const parse = esquemaEncuesta.safeParse(datos);
+  if (!parse.success) return { ok: false, error: primeraInvalidez(parse.error) };
+  const { pregunta, opciones } = parse.data;
+
+  await prisma.encuesta.create({
+    data: { pregunta, esAdmin: true, opciones: { create: opciones.map((texto) => ({ texto })) } },
+  });
+
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Elimina una encuesta (con sus opciones y votos, CASCADE).
+ */
+export async function eliminarEncuesta(encuestaId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const existe = await prisma.encuesta.findUnique({ where: { id: encuestaId }, select: { id: true } });
+  if (!existe) return { ok: false, error: "Encuesta no encontrada." };
+
+  await prisma.encuesta.delete({ where: { id: encuestaId } });
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Cierra o reabre cualquier encuesta (solo admin).
+ */
+export async function alternarEncuestaActiva(encuestaId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const existe = await prisma.encuesta.findUnique({
+    where: { id: encuestaId },
+    select: { id: true, activa: true },
+  });
+  if (!existe) return { ok: false, error: "Encuesta no encontrada." };
+
+  await prisma.encuesta.update({
+    where: { id: encuestaId },
+    data: { activa: !existe.activa },
+  });
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Actualiza el límite global diario de encuestas públicas (anti-spam).
+ */
+export async function actualizarConfiguracion(datos: unknown): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const parse = esquemaConfiguracion.safeParse(datos);
+  if (!parse.success) return { ok: false, error: primeraInvalidez(parse.error) };
+
+  const existente = await prisma.configuracion.findUnique({ where: { id: 1 } });
+  if (existente) {
+    await prisma.configuracion.update({
+      where: { id: 1 },
+      data: { maxEncuestasDiarias: parse.data.maxEncuestasDiarias },
+    });
+  } else {
+    await prisma.configuracion.create({
+      data: {
+        id: 1,
+        fechaInicio: new Date(),
+        maxEncuestasDiarias: parse.data.maxEncuestasDiarias,
+      },
+    });
+  }
 
   refrescar();
   return { ok: true };

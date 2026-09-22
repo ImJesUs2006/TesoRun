@@ -2,9 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { ToastProvider } from "@/components/admin/toast-provider";
 import { BotonSonido } from "@/components/admin/boton-sonido";
 import { ConfigFecha } from "@/components/admin/config-fecha";
+import { ConfigLimiteEncuestas } from "@/components/admin/config-limite-encuestas";
 import { FormNuevoAlumno } from "@/components/admin/form-nuevo-alumno";
 import { GestionAnuncios } from "@/components/admin/gestion-anuncios";
 import { GestionComentarios } from "@/components/admin/gestion-comentarios";
+import { GestionEncuestas } from "@/components/admin/gestion-encuestas";
+import { GestionSugerencias } from "@/components/admin/gestion-sugerencias";
 import { HistorialTransacciones } from "@/components/admin/historial-transacciones";
 import { Resumen } from "@/components/admin/resumen";
 import { TablaAdmin } from "@/components/admin/tabla-admin";
@@ -15,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminTesoPage() {
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-  const [alumnos, anuncios, transacciones, ingresosMes, gastosMes, comentarios, configuracion] =
+  const [alumnos, anuncios, transacciones, ingresosMes, gastosMes, comentarios, encuestas, sugerencias, configuracion] =
     await Promise.all([
       prisma.alumno.findMany({ orderBy: { nombre: "asc" } }),
       prisma.anuncio.findMany({ orderBy: { fecha: "desc" }, take: 20 }),
@@ -35,8 +38,17 @@ export default async function AdminTesoPage() {
       prisma.comentario.findMany({
         orderBy: { fecha: "desc" },
         take: 50,
-        include: { alumno: { select: { nombre: true } } },
+        include: {
+          alumno: { select: { nombre: true } },
+          reacciones: { select: { emoji: true, votantes: true } },
+        },
       }),
+      prisma.encuesta.findMany({
+        orderBy: { fecha: "desc" },
+        take: 10,
+        include: { opciones: { select: { id: true, texto: true, votos: true } } },
+      }),
+      prisma.sugerencia.findMany({ orderBy: { fecha: "desc" }, take: 50 }),
       prisma.configuracion.findUnique({ where: { id: 1 } }),
     ]);
 
@@ -89,6 +101,8 @@ export default async function AdminTesoPage() {
 
         <ConfigFecha fechaInicio={configuracion?.fechaInicio ?? null} />
 
+        <ConfigLimiteEncuestas maxEncuestasDiarias={configuracion?.maxEncuestasDiarias ?? 5} />
+
         <GestionAnuncios
           anuncios={anuncios.map((a) => ({
             id: a.id,
@@ -101,9 +115,34 @@ export default async function AdminTesoPage() {
         <GestionComentarios
           comentarios={comentarios.map((c) => ({
             id: c.id,
+            alias: c.alias,
             contenido: c.contenido,
+            gifUrl: c.gifUrl,
+            imageUrl: c.imageUrl,
+            audioUrl: c.audioUrl,
             fecha: c.fecha,
-            alumnoNombre: c.alumno.nombre,
+            alumnoNombre: c.alumno?.nombre ?? null,
+            reacciones: c.reacciones,
+          }))}
+        />
+
+        <GestionEncuestas
+          encuestas={encuestas.map((e) => ({
+            id: e.id,
+            pregunta: e.pregunta,
+            fecha: e.fecha,
+            activa: e.activa,
+            esAdmin: e.esAdmin,
+            opciones: e.opciones.map((o) => ({ id: o.id, texto: o.texto, votos: o.votos })),
+          }))}
+        />
+
+        <GestionSugerencias
+          sugerencias={sugerencias.map((s) => ({
+            id: s.id,
+            mensaje: s.mensaje,
+            leida: s.leida,
+            fecha: s.fecha,
           }))}
         />
 

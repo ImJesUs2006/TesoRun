@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { META_MENSUAL } from "@/lib/config";
 import { calcularDeuda } from "@/lib/deuda";
+import { cookies } from "next/headers";
+import { COOKIE_DEVICE } from "@/lib/seguridad";
 import { ArrowDownToLine, Banknote, CalendarDays, FileSpreadsheet, Scale } from "lucide-react";
 import { AnunciosCinta } from "@/components/anuncios-cinta";
 import { CarruselSeBusca } from "@/components/carrusel-se-busca";
@@ -9,15 +11,24 @@ import { ListaNegra } from "@/components/lista-negra";
 import { MuroGastos } from "@/components/muro-gastos";
 import { PistaCarreras } from "@/components/pista-carreras";
 import { PodioHeroes } from "@/components/podio-heroes";
-import { TablonComentarios } from "@/components/comentarios";
+import { BuzonSugerencias } from "@/components/buzon-sugerencias";
+import { Encuestas, type EncuestaVista } from "@/components/muro/encuestas";
+import { MuroComentarios } from "@/components/comentarios";
 import type { NotaTransaccion } from "@/lib/tipos";
 
 export const dynamic = "force-dynamic";
 
 const DIA_MS = 86_400_000;
 const DIAS_PURGA_COMENTARIOS = 21;
+const COMENTARIOS_POR_PAGINA = 10;
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageRaw } = await searchParams;
+  const pagina = Math.max(1, Math.min(Number(pageRaw) || 1, 9999));
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const inicioVentana = new Date(Date.now() - 12 * 7 * DIA_MS);
 
@@ -26,7 +37,9 @@ export default async function HomePage() {
     where: { fecha: { lt: new Date(Date.now() - DIAS_PURGA_COMENTARIOS * DIA_MS) } },
   });
 
-  const [alumnos, anuncios, comentarios, pagos, ingresosMes, gastosMes, gastos, configuracion] =
+  const deviceId = (await cookies()).get(COOKIE_DEVICE)?.value ?? null;
+
+  const [alumnos, anuncios, comentarios, totalComentarios, encuestas, pagos, ingresosMes, gastosMes, gastos, configuracion] =
     await Promise.all([
       prisma.alumno.findMany({
         orderBy: [{ semanasPagadas: "desc" }, { mejorRacha: "desc" }],
@@ -34,8 +47,18 @@ export default async function HomePage() {
       prisma.anuncio.findMany({ where: { activo: true }, orderBy: { fecha: "desc" }, take: 5 }),
       prisma.comentario.findMany({
         orderBy: { fecha: "desc" },
-        take: 25,
-        include: { alumno: { select: { nombre: true } } },
+        skip: (pagina - 1) * COMENTARIOS_POR_PAGINA,
+        take: COMENTARIOS_POR_PAGINA,
+        include: {
+          alumno: { select: { nombre: true } },
+          reacciones: { select: { emoji: true, votantes: true } },
+        },
+      }),
+      prisma.comentario.count(),
+      prisma.encuesta.findMany({
+        orderBy: { fecha: "desc" },
+        take: 3,
+        include: { opciones: { select: { id: true, texto: true, votos: true, votantes: true } } },
       }),
       prisma.transaccion.findMany({
         where: { tipo: "INGRESO", fecha: { gte: inicioVentana } },
@@ -57,6 +80,33 @@ export default async function HomePage() {
       }),
       prisma.configuracion.findUnique({ where: { id: 1 } }),
     ]);
+
+  const totalPaginas = Math.max(1, Math.ceil(totalComentarios / COMENTARIOS_POR_PAGINA));
+
+  const encuestasVista: EncuestaVista[] = encuestas.map((encuesta) => {
+    let votadoOpcionId: string | null = null;
+    if (deviceId) {
+      for (const opcion of encuesta.opciones) {
+        if (opcion.votantes.includes(deviceId)) {
+          votadoOpcionId = opcion.id;
+          break;
+        }
+      }
+    }
+    return {
+      id: encuesta.id,
+      pregunta: encuesta.pregunta,
+      esAdmin: encuesta.esAdmin,
+      activa: encuesta.activa,
+      creadorId: encuesta.creadorId,
+      opciones: encuesta.opciones.map((o) => ({
+        id: o.id,
+        texto: o.texto,
+        votos: o.votos,
+        votado: o.id === votadoOpcionId,
+      })),
+    };
+  });
 
   const pagosPorAlumno: Record<string, Date[]> = {};
   const notasPorAlumno: Record<string, NotaTransaccion[]> = {};
@@ -178,15 +228,26 @@ export default async function HomePage() {
         }))}
       />
 
-      <TablonComentarios
-        alumnos={alumnos.map((a) => ({ id: a.id, nombre: a.nombre }))}
+      <Encuestas encuestas={encuestasVista} deviceActual={deviceId} />
+
+      <MuroComentarios
         comentarios={comentarios.map((c) => ({
           id: c.id,
+          alias: c.alias,
           contenido: c.contenido,
+          gifUrl: c.gifUrl,
+          imageUrl: c.imageUrl,
+          audioUrl: c.audioUrl,
           fecha: c.fecha,
-          alumnoNombre: c.alumno.nombre,
+          alumnoNombre: c.alumno?.nombre ?? null,
+          reacciones: c.reacciones.map((r) => ({ emoji: r.emoji, votantes: r.votantes })),
         }))}
+        pagina={pagina}
+        totalPaginas={totalPaginas}
+        deviceActual={deviceId}
       />
+
+      <BuzonSugerencias />
     </main>
   );
 }

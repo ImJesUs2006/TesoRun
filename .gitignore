@@ -24,3 +24,5 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+# respaldos locales
+/backup/

@@ -24,6 +24,9 @@ const NOTAS = [
 
 async function main() {
   await prisma.configuracion.deleteMany();
+  await prisma.opcion.deleteMany();
+  await prisma.encuesta.deleteMany();
+  await prisma.sugerencia.deleteMany();
   await prisma.comentario.deleteMany();
   await prisma.anuncio.deleteMany();
   await prisma.transaccion.deleteMany();
@@ -71,14 +74,50 @@ async function main() {
 
   await prisma.comentario.createMany({
     data: [
-      { contenido: "¿Alguien tiene el apunte de la clase pasada?", alumnoId: creados[0].id },
-      { contenido: "Racha de 6 semanas, nadie me alcanza.", alumnoId: creados[0].id },
-      { contenido: "Ya pagué mi deuda, verifiquen el tablón.", alumnoId: creados[3].id },
+      { alias: "Monito Tacaño", contenido: "¿Alguien tiene el apunte de la clase pasada? Comparto los míos." },
+      { alias: "Burrito Misterioso", contenido: "Ya pagué mi deuda, verifiquen el tablón." },
+      { alias: "Gatito Fiestero", contenido: "El próximo viernes junta general, no falten." },
+    ],
+  });
+
+  await prisma.comentario.create({
+    data: {
+      alias: "Cerdito Veloz",
+      contenido: "Racha de 9 semanas, nadie me alcanza 🐷",
+      reacciones: {
+        create: [
+          { emoji: "😂", votantes: ["dev_seed1", "dev_seed2"] },
+          { emoji: "🔥", votantes: ["dev_seed3"] },
+          { emoji: "❤️", votantes: ["dev_seed1"] },
+        ],
+      },
+    },
+  });
+
+  const encuesta = await prisma.encuesta.create({
+    data: {
+      pregunta: "¿Qué hacemos con el fondo para la fiesta de fin de semestre?",
+      esAdmin: true,
+      opciones: {
+        create: [
+          { texto: "Pa' la cena grupal", votos: 4, votantes: ["dev_seed1", "dev_seed2", "dev_seed3", "dev_seed4"] },
+          { texto: "Ahorrarlo para la siguiente", votos: 2, votantes: ["dev_seed5", "dev_seed6"] },
+          { texto: "Comprar trofeo al tesorero", votos: 1, votantes: ["dev_seed7"] },
+        ],
+      },
+    },
+  });
+  void encuesta;
+
+  await prisma.sugerencia.createMany({
+    data: [
+      { mensaje: "Buen trabajo con el tablón, ¡se ve genial!" },
+      { mensaje: "Podrían poner el botón de descargar Excel en la vista de invitados." },
     ],
   });
 
   console.log(
-    `Seed listo: ${creados.length} alumnos, ${transacciones.length} pagos, ${GASTOS.length} gastos, 2 anuncios y 3 comentarios.`,
+    `Seed listo: ${creados.length} alumnos, ${transacciones.length} pagos, ${GASTOS.length} gastos, 2 anuncios, 4 comentarios, 1 encuesta y 2 sugerencias.`,
   );
 }
 

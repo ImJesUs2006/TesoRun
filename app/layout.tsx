@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo_Black } from "next/font/google";
+import { Toaster } from "@/components/muro/toast";
 import "./globals.css";
 
 const archivoBlack = Archivo_Black({
@@ -19,7 +20,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={archivoBlack.variable}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

@@ -37,12 +37,27 @@ model Transaccion {
 
 model Comentario {
   id        String   @id @default(cuid())
-  contenido String
+  alias     String // Apodo anónimo (ej. "Monito Tacaño")
+  contenido String?  @default("") @db.Text // "" si el comentario es solo GIF/imagen/audio
+  gifUrl    String? // GIF del buscador de Giphy o catálogo permitido
+  imageUrl  String? @db.Text // URL de imagen (Cloudinary) o catálogo permitido
+  audioUrl  String? @db.Text // URL de audio (Cloudinary)
   fecha     DateTime @default(now())
-  alumnoId  String
-  alumno    Alumno   @relation(fields: [alumnoId], references: [id], onDelete: Cascade)
+  alumnoId  String? // Legado: comentarios antiguos atados a un alumno
+  alumno    Alumno?  @relation(fields: [alumnoId], references: [id], onDelete: SetNull)
+  reacciones Reaccion[]
 
   @@index([fecha])
+}
+
+model Reaccion {
+  id           String    @id @default(cuid())
+  emoji        String // Cualquier emoji UTF-8 (validado en servidor)
+  votantes     String[] // deviceIds que reaccionaron
+  comentarioId String
+  comentario   Comentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+
+  @@unique([comentarioId, emoji])
 }
 
 model Anuncio {
@@ -52,8 +67,41 @@ model Anuncio {
   fecha   DateTime @default(now())
 }
 
+model Encuesta {
+  id        String   @id @default(cuid())
+  pregunta  String
+  esAdmin   Boolean  @default(false)
+  activa    Boolean  @default(true) // false = cerrada, solo se muestran resultados
+  creadorId String? // deviceId del creador (encuestas públicas)
+  fecha     DateTime @default(now())
+  opciones  Opcion[]
+
+  @@index([fecha])
+}
+
+model Opcion {
+  id         String   @id @default(cuid())
+  texto      String
+  votos      Int      @default(0)
+  votantes   String[] // deviceIds que ya votaron (evita multi-voto)
+  encuestaId String
+  encuesta   Encuesta @relation(fields: [encuestaId], references: [id], onDelete: Cascade)
+
+  @@index([encuestaId])
+}
+
+model Sugerencia {
+  id      String   @id @default(cuid())
+  mensaje String
+  leida   Boolean  @default(false)
+  fecha   DateTime @default(now())
+
+  @@index([fecha])
+}
+
 // Fila unica (id = 1) con la fecha de inicio oficial de recoleccion.
 model Configuracion {
-  id          Int      @id @default(1)
-  fechaInicio DateTime
+  id                  Int      @id @default(1)
+  fechaInicio         DateTime
+  maxEncuestasDiarias Int      @default(5) // Limite global anti-spam del muro
 }
