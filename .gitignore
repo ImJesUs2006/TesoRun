@@ -26,3 +26,5 @@ yarn-error.log*
 *.tsbuildinfo
 # respaldos locales
 /backup/
+.vercel
+.env*.local

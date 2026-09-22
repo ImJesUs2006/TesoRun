@@ -4,7 +4,7 @@ Tesorería gamificada para el grupo universitario. Lleva el control de cuotas se
 
 ## Características
 
-- **Página pública** (`/`): podio de héroes, carrusel "se busca" (deslizable), lista negra, clase completa, muro de gastos y tablón de comentarios con máximo 3 al día por persona.
+- **Página pública** (`/`): podio de héroes, carrusel "se busca" (deslizable), lista negra, clase completa, muro de gastos y **muro anónimo** de comentarios. Al publicar puedes elegir **✍️ Con nombre** (tu apodo, recordado en el navegador y editable) o **🙈 Anónimo** (apodo estable tipo "Monito Veloz"); el compromiso es el mismo para todos.
 - **Deuda calculada en vivo**: se deriva de la fecha de inicio de recolección y las semanas pagadas; cambias la fecha y todo se recalcula solo. La semana en curso también cuenta (fecha "hoy" = 1 semana de deuda).
 - **Muro de gastos** público y **reporte Excel** descargable (texto plano con colores, sin fotos).
 - **Panel de tesorero** (`/admin-teso`): alta/baja de alumnos, cobrar +$20 (bloqueado si no hay deuda), deshacer pagos, editar fecha de inicio, gestionar anuncios y comentarios, foto por archivo (Base64).
@@ -126,6 +126,7 @@ Abre [http://localhost:3000](http://localhost:3000).
 - El PIN vive en el servidor (`ADMIN_PASSWORD`); el login firma una cookie HTTP-only. Cambiar el PIN invalida todas las sesiones.
 - Sin `ADMIN_PASSWORD` configurado, el panel responde 500 y nadie entra *(fail-closed)*.
 - Los comentarios públicos se purgan solos al cumplir 21 días.
+- El nombre elegido al comentar se guarda solo en ese navegador (localStorage), nunca en el servidor; el texto del muro se renderiza escapado (sin HTML), sin riesgo de XSS.
 - El historial de pagos se conserva aunque elimines a un alumno.
 
 ## Estructura

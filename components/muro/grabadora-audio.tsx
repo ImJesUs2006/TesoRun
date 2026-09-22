@@ -147,7 +147,14 @@ export function GrabadoraAudio({ audioUrl, onListo, onQuitar, onCargando }: Prop
             className="inline-flex cursor-pointer items-center rounded-full border-2 border-black bg-white p-2 shadow-[2px_2px_0_0_#000] transition hover:bg-yellow-100 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
           >
             <FileUp className="h-4 w-4" />
-            <input type="file" accept="audio/*" className="sr-only" onChange={subirArchivo} />
+            <input
+              type="file"
+              accept="audio/*"
+              aria-label="Subir archivo de audio"
+              tabIndex={-1}
+              className="absolute left-[-9999px] opacity-0"
+              onChange={subirArchivo}
+            />
           </label>
         </>
       )}

@@ -2,12 +2,13 @@ import { cookies, headers } from "next/headers";
 import { z } from "zod";
 import {
   MAX_CONTENIDO,
+  MAX_NOMBRE,
   MAX_SUGERENCIA,
   MAX_AUDIO_BYTES,
   MAX_IMAGEN_BYTES,
 } from "./limites";
 
-export { MAX_CONTENIDO, MAX_SUGERENCIA, MAX_AUDIO_BYTES, MAX_IMAGEN_BYTES };
+export { MAX_CONTENIDO, MAX_NOMBRE, MAX_SUGERENCIA, MAX_AUDIO_BYTES, MAX_IMAGEN_BYTES };
 
 export const COOKIE_DEVICE = "tesorun_device";
 
@@ -107,6 +108,15 @@ export const esquemaComentario = z
     gifUrl: z.string().trim().max(600).or(z.literal("")).optional(),
     imageUrl: z.string().trim().max(600).or(z.literal("")).optional(),
     audioUrl: z.string().trim().max(600).or(z.literal("")).optional(),
+    // Nombre elegido por el autor; "" (o ausente) = anonimato con apodo estable.
+    nombre: z
+      .string()
+      .trim()
+      .max(MAX_NOMBRE, { message: `El nombre puede tener máximo ${MAX_NOMBRE} caracteres.` })
+      .refine((n) => n.length === 0 || !/[\u0000-\u001F\u007F]/.test(n), {
+        message: "El nombre no puede contener caracteres raros.",
+      })
+      .optional(),
   })
   .refine(
     (v) =>

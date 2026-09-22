@@ -45,6 +45,7 @@ export async function reportarErrorSubida(datos: unknown): Promise<ResPublico> {
  * Publica un comentario anónimo (alias estable por deviceId).
  * - Zod valida contenido (max 250), gif/image (allowlist), audio (data URL).
  * - Cooldown de 10 s por deviceId E IP; tope de 30/hora por IP.
+ * - Si el autor escribe su nombre, ese es el alias; si no, apodo estable.
  */
 export async function crearComentario(datos: unknown): Promise<ResPublico> {
   const parse = esquemaComentario.safeParse(datos);
@@ -67,9 +68,10 @@ export async function crearComentario(datos: unknown): Promise<ResPublico> {
   }
 
   const data = parse.data;
+  const nombre = data.nombre?.trim() ?? "";
   await prisma.comentario.create({
     data: {
-      alias: aliasPara(deviceId),
+      alias: nombre.length > 0 ? nombre : aliasPara(deviceId),
       contenido: data.contenido.trim(), // "" (nunca null) si el comentario es solo multimedia
       gifUrl: data.gifUrl || null,
       imageUrl: data.imageUrl || null,

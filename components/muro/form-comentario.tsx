@@ -8,9 +8,20 @@ import { SelectorGifs } from "./selector-gifs";
 import { ImagenCensurable } from "./censura";
 import { subirACloudinary } from "./cloudinary";
 import { mostrarToast } from "./toast";
-import { MAX_CONTENIDO, COOLDOWN_COMENTARIO_MS, MAX_IMAGEN_BYTES } from "@/lib/limites";
+import { MAX_CONTENIDO, MAX_NOMBRE, COOLDOWN_COMENTARIO_MS, MAX_IMAGEN_BYTES } from "@/lib/limites";
 
 const formatoEspera = new Intl.DateTimeFormat("es-MX", { minute: "2-digit", second: "2-digit" });
+
+const CLAVE_NOMBRE_GUARDADO = "tesorun_nombre_elegido";
+
+function nombreGuardado(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(CLAVE_NOMBRE_GUARDADO) ?? "";
+  } catch {
+    return "";
+  }
+}
 
 type Feedback = { tipo: "ok" | "error"; mensaje: string };
 
@@ -23,6 +34,8 @@ export function FormComentario() {
   const [subiendoAudio, setSubiendoAudio] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [modoNombre, setModoNombre] = useState(() => nombreGuardado().length > 0);
+  const [nombre, setNombre] = useState(nombreGuardado);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -70,6 +83,12 @@ export function FormComentario() {
     e.preventDefault();
     setFeedback(null);
 
+    const nombreFinal = modoNombre ? nombre.trim() : "";
+    if (modoNombre && nombreFinal.length === 0) {
+      mostrarToast("Escribe tu nombre o elige Anónimo");
+      return;
+    }
+
     const vacio =
       contenido.trim().length === 0 && gifUrl === "" && imagenUrl === "" && audioUrl === "";
     if (vacio) {
@@ -78,8 +97,15 @@ export function FormComentario() {
     }
 
     startTransition(async () => {
-      const res = await crearComentario({ contenido, gifUrl, imageUrl: imagenUrl, audioUrl });
+      const res = await crearComentario({ contenido, gifUrl, imageUrl: imagenUrl, audioUrl, nombre: nombreFinal });
       if (res.ok) {
+        if (nombreFinal.length > 0) {
+          try {
+            localStorage.setItem(CLAVE_NOMBRE_GUARDADO, nombreFinal);
+          } catch {
+            // sin almacenamiento: no pasa nada
+          }
+        }
         setContenido("");
         setGifUrl("");
         setImagenUrl("");
@@ -99,13 +125,48 @@ export function FormComentario() {
 
   return (
     <form onSubmit={enviar} className="grid gap-3 rounded-xl border-4 border-black bg-yellow-50 p-4 shadow-[5px_5px_0_0_#000]">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-black uppercase text-black/50">Publica como:</span>
+        <div className="flex overflow-hidden rounded-full border-2 border-black bg-white">
+          <button
+            type="button"
+            onClick={() => setModoNombre(false)}
+            className={`px-3 py-1 text-xs font-black transition ${
+              !modoNombre ? "bg-black text-white" : "text-black/60 hover:bg-yellow-100"
+            }`}
+          >
+             Anónimo
+          </button>
+          <button
+            type="button"
+            onClick={() => setModoNombre(true)}
+            className={`px-3 py-1 text-xs font-black transition ${
+              modoNombre ? "bg-black text-white" : "text-black/60 hover:bg-yellow-100"
+            }`}
+          >
+            Nombre
+          </button>
+        </div>
+        {modoNombre && (
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            maxLength={MAX_NOMBRE}
+            autoComplete="nickname"
+            placeholder="Tu nombre o apodo"
+            aria-label="Nombre o apodo"
+            className="w-full max-w-[200px] rounded-lg border-4 border-black bg-white px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-yellow-200"
+          />
+        )}
+      </div>
+
       <div>
         <textarea
           value={contenido}
           onChange={(e) => setContenido(e.target.value)}
           maxLength={MAX_CONTENIDO}
           rows={2}
-          placeholder="Dilo aquí… anónimo, tipo Confesionario."
+          placeholder="Rompe el hielo..."
           className="w-full resize-none rounded-lg border-4 border-black px-3 py-2 font-semibold focus:outline-none focus:ring-4 focus:ring-yellow-200"
         />
         <p className={contenido.length >= MAX_CONTENIDO ? "mt-1 text-right text-xs font-black text-red-500" : "mt-1 text-right text-xs font-bold text-black/40"}>
@@ -167,7 +228,15 @@ export function FormComentario() {
           }`}
         >
           {subiendoImagen ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-          <input type="file" accept="image/*" className="sr-only" disabled={subiendo} onChange={subirImagen} />
+          <input
+            type="file"
+            accept="image/*"
+            aria-label="Subir imagen"
+            tabIndex={-1}
+            className="absolute left-[-9999px] opacity-0"
+            disabled={subiendo}
+            onChange={subirImagen}
+          />
         </label>
 
         <GrabadoraAudio
@@ -188,9 +257,6 @@ export function FormComentario() {
         )}
       </div>
 
-      <p className="text-xs font-bold text-black/50">
-        Anónimo con apodo estable · GIF de Giphy · foto o nota de voz opcional (se suben a Cloudinary).
-      </p>
       {cooldown > 0 && (
         <p className="text-xs font-black text-red-500">
           Siguiente comentario disponible en {formatoEspera.format(new Date(cooldown))}.
