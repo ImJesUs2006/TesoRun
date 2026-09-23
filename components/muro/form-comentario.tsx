@@ -8,20 +8,10 @@ import { SelectorGifs } from "./selector-gifs";
 import { ImagenCensurable } from "./censura";
 import { subirACloudinary } from "./cloudinary";
 import { mostrarToast } from "./toast";
-import { MAX_CONTENIDO, MAX_NOMBRE, COOLDOWN_COMENTARIO_MS, MAX_IMAGEN_BYTES } from "@/lib/limites";
+import { leerNombreGuardado, guardarNombre, SelectorNombre } from "./selector-nombre";
+import { MAX_CONTENIDO, COOLDOWN_COMENTARIO_MS, MAX_IMAGEN_BYTES } from "@/lib/limites";
 
 const formatoEspera = new Intl.DateTimeFormat("es-MX", { minute: "2-digit", second: "2-digit" });
-
-const CLAVE_NOMBRE_GUARDADO = "tesorun_nombre_elegido";
-
-function nombreGuardado(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    return localStorage.getItem(CLAVE_NOMBRE_GUARDADO) ?? "";
-  } catch {
-    return "";
-  }
-}
 
 type Feedback = { tipo: "ok" | "error"; mensaje: string };
 
@@ -34,8 +24,8 @@ export function FormComentario() {
   const [subiendoAudio, setSubiendoAudio] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [cooldown, setCooldown] = useState(0);
-  const [modoNombre, setModoNombre] = useState(() => nombreGuardado().length > 0);
-  const [nombre, setNombre] = useState(nombreGuardado);
+  const [modoNombre, setModoNombre] = useState(() => leerNombreGuardado().length > 0);
+  const [nombre, setNombre] = useState(leerNombreGuardado);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -59,24 +49,35 @@ export function FormComentario() {
     }, 1000);
   }
 
-  async function subirImagen(e: React.ChangeEvent<HTMLInputElement>) {
-    const archivo = e.target.files?.[0];
-    e.target.value = "";
+  async function procesarImagen(archivo: File | undefined) {
     if (!archivo) return;
     setFeedback(null);
+    if (!archivo.type.startsWith("image/")) {
+      mostrarToast("Solo se permiten imágenes");
+      return;
+    }
     if (archivo.size > MAX_IMAGEN_BYTES) {
       mostrarToast("Imagen muy pesada (máx ~1.5 MB)");
       return;
     }
     setSubiendoImagen(true);
-    const r = await subirACloudinary(archivo, "imagen");
-    setSubiendoImagen(false);
-    if (!r.ok) {
-      mostrarToast(r.error);
-      return;
+    try {
+      const r = await subirACloudinary(archivo, "imagen");
+      if (!r.ok) {
+        mostrarToast(r.error);
+        return;
+      }
+      setImagenUrl(r.url);
+      setGifUrl("");
+    } finally {
+      setSubiendoImagen(false);
     }
-    setImagenUrl(r.url);
-    setGifUrl("");
+  }
+
+  function subirImagen(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    void procesarImagen(archivo);
   }
 
   function enviar(e: React.FormEvent) {
@@ -99,13 +100,7 @@ export function FormComentario() {
     startTransition(async () => {
       const res = await crearComentario({ contenido, gifUrl, imageUrl: imagenUrl, audioUrl, nombre: nombreFinal });
       if (res.ok) {
-        if (nombreFinal.length > 0) {
-          try {
-            localStorage.setItem(CLAVE_NOMBRE_GUARDADO, nombreFinal);
-          } catch {
-            // sin almacenamiento: no pasa nada
-          }
-        }
+        if (nombreFinal.length > 0) guardarNombre(nombreFinal);
         setContenido("");
         setGifUrl("");
         setImagenUrl("");
@@ -127,37 +122,12 @@ export function FormComentario() {
     <form onSubmit={enviar} className="grid gap-3 rounded-xl border-4 border-black bg-yellow-50 p-4 shadow-[5px_5px_0_0_#000]">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-black uppercase text-black/50">Publica como:</span>
-        <div className="flex overflow-hidden rounded-full border-2 border-black bg-white">
-          <button
-            type="button"
-            onClick={() => setModoNombre(false)}
-            className={`px-3 py-1 text-xs font-black transition ${
-              !modoNombre ? "bg-black text-white" : "text-black/60 hover:bg-yellow-100"
-            }`}
-          >
-             Anónimo
-          </button>
-          <button
-            type="button"
-            onClick={() => setModoNombre(true)}
-            className={`px-3 py-1 text-xs font-black transition ${
-              modoNombre ? "bg-black text-white" : "text-black/60 hover:bg-yellow-100"
-            }`}
-          >
-            Nombre
-          </button>
-        </div>
-        {modoNombre && (
-          <input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            maxLength={MAX_NOMBRE}
-            autoComplete="nickname"
-            placeholder="Tu nombre o apodo"
-            aria-label="Nombre o apodo"
-            className="w-full max-w-[200px] rounded-lg border-4 border-black bg-white px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-yellow-200"
-          />
-        )}
+        <SelectorNombre
+          modo={modoNombre}
+          nombre={nombre}
+          onChangeModo={setModoNombre}
+          onChangeNombre={setNombre}
+        />
       </div>
 
       <div>
@@ -167,6 +137,14 @@ export function FormComentario() {
           maxLength={MAX_CONTENIDO}
           rows={2}
           placeholder="Rompe el hielo..."
+          onPaste={(e) => {
+            const items = e.clipboardData?.files;
+            if (!items || items.length === 0) return;
+            const archivo = Array.from(items).find((f) => f.type.startsWith("image/"));
+            if (!archivo) return;
+            e.preventDefault();
+            void procesarImagen(archivo);
+          }}
           className="w-full resize-none rounded-lg border-4 border-black px-3 py-2 font-semibold focus:outline-none focus:ring-4 focus:ring-yellow-200"
         />
         <p className={contenido.length >= MAX_CONTENIDO ? "mt-1 text-right text-xs font-black text-red-500" : "mt-1 text-right text-xs font-bold text-black/40"}>

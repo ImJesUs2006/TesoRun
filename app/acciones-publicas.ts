@@ -46,6 +46,7 @@ export async function reportarErrorSubida(datos: unknown): Promise<ResPublico> {
  * - Zod valida contenido (max 250), gif/image (allowlist), audio (data URL).
  * - Cooldown de 10 s por deviceId E IP; tope de 30/hora por IP.
  * - Si el autor escribe su nombre, ese es el alias; si no, apodo estable.
+ * - parentId opcional = respuesta (hilo) a un comentario raíz.
  */
 export async function crearComentario(datos: unknown): Promise<ResPublico> {
   const parse = esquemaComentario.safeParse(datos);
@@ -69,6 +70,18 @@ export async function crearComentario(datos: unknown): Promise<ResPublico> {
 
   const data = parse.data;
   const nombre = data.nombre?.trim() ?? "";
+
+  // Hilos: solo se responde a comentarios raíz (evita anidamiento infinito).
+  let parentId: string | null = data.parentId ?? null;
+  if (parentId) {
+    const padre = await prisma.comentario.findUnique({
+      where: { id: parentId },
+      select: { parentId: true },
+    });
+    if (!padre) return { ok: false, error: "El comentario al que respondes ya no existe." };
+    if (padre.parentId) return { ok: false, error: "Solo puedes responder a comentarios principales." };
+  }
+
   await prisma.comentario.create({
     data: {
       alias: nombre.length > 0 ? nombre : aliasPara(deviceId),
@@ -76,6 +89,7 @@ export async function crearComentario(datos: unknown): Promise<ResPublico> {
       gifUrl: data.gifUrl || null,
       imageUrl: data.imageUrl || null,
       audioUrl: data.audioUrl || null,
+      parentId,
     },
   });
 

@@ -42,19 +42,32 @@ export default async function HomePage({
   const [alumnos, anuncios, comentarios, totalComentarios, encuestas, pagos, ingresosMes, gastosMes, gastos, configuracion] =
     await Promise.all([
       prisma.alumno.findMany({
-        orderBy: [{ semanasPagadas: "desc" }, { mejorRacha: "desc" }],
+        orderBy: [
+          { rachaActual: "desc" },
+          { semanasPagadas: "desc" },
+          { ultimoPago: "asc" }, // gana quien pagó primero
+          { nombre: "asc" },
+        ],
       }),
       prisma.anuncio.findMany({ where: { activo: true }, orderBy: { fecha: "desc" }, take: 5 }),
       prisma.comentario.findMany({
+        where: { parentId: null }, // solo comentarios raíz en la portada; las respuestas van anidadas
         orderBy: { fecha: "desc" },
         skip: (pagina - 1) * COMENTARIOS_POR_PAGINA,
         take: COMENTARIOS_POR_PAGINA,
         include: {
           alumno: { select: { nombre: true } },
           reacciones: { select: { emoji: true, votantes: true } },
+          respuestas: {
+            orderBy: { fecha: "asc" },
+            include: {
+              alumno: { select: { nombre: true } },
+              reacciones: { select: { emoji: true, votantes: true } },
+            },
+          },
         },
       }),
-      prisma.comentario.count(),
+      prisma.comentario.count({ where: { parentId: null } }),
       prisma.encuesta.findMany({
         orderBy: { fecha: "desc" },
         take: 3,
@@ -82,6 +95,33 @@ export default async function HomePage({
     ]);
 
   const totalPaginas = Math.max(1, Math.ceil(totalComentarios / COMENTARIOS_POR_PAGINA));
+
+  type ComentarioDB = {
+    id: string;
+    alias: string;
+    contenido: string | null;
+    gifUrl: string | null;
+    imageUrl: string | null;
+    audioUrl: string | null;
+    fecha: Date;
+    alumno: { nombre: string } | null;
+    reacciones: { emoji: string; votantes: string[] }[];
+    respuestas?: ComentarioDB[];
+  };
+  function aComentarioVista(c: ComentarioDB): import("@/components/muro/comentario-card").ComentarioVista {
+    return {
+      id: c.id,
+      alias: c.alias,
+      contenido: c.contenido,
+      gifUrl: c.gifUrl,
+      imageUrl: c.imageUrl,
+      audioUrl: c.audioUrl,
+      fecha: c.fecha,
+      alumnoNombre: c.alumno?.nombre ?? null,
+      reacciones: c.reacciones.map((r) => ({ emoji: r.emoji, votantes: r.votantes })),
+      respuestas: (c.respuestas ?? []).map(aComentarioVista),
+    };
+  }
 
   const encuestasVista: EncuestaVista[] = encuestas.map((encuesta) => {
     let votadoOpcionId: string | null = null;
@@ -231,17 +271,7 @@ export default async function HomePage({
       <Encuestas encuestas={encuestasVista} deviceActual={deviceId} />
 
       <MuroComentarios
-        comentarios={comentarios.map((c) => ({
-          id: c.id,
-          alias: c.alias,
-          contenido: c.contenido,
-          gifUrl: c.gifUrl,
-          imageUrl: c.imageUrl,
-          audioUrl: c.audioUrl,
-          fecha: c.fecha,
-          alumnoNombre: c.alumno?.nombre ?? null,
-          reacciones: c.reacciones.map((r) => ({ emoji: r.emoji, votantes: r.votantes })),
-        }))}
+        comentarios={comentarios.map(aComentarioVista)}
         pagina={pagina}
         totalPaginas={totalPaginas}
         deviceActual={deviceId}

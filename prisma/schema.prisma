@@ -45,9 +45,13 @@ model Comentario {
   fecha     DateTime @default(now())
   alumnoId  String? // Legado: comentarios antiguos atados a un alumno
   alumno    Alumno?  @relation(fields: [alumnoId], references: [id], onDelete: SetNull)
+  parentId  String? // Hilos: si existe, este comentario es respuesta de otro
+  padre     Comentario?  @relation("Respuestas", fields: [parentId], references: [id], onDelete: Cascade)
+  respuestas Comentario[] @relation("Respuestas")
   reacciones Reaccion[]
 
   @@index([fecha])
+  @@index([parentId])
 }
 
 model Reaccion {

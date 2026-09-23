@@ -117,6 +117,8 @@ export const esquemaComentario = z
         message: "El nombre no puede contener caracteres raros.",
       })
       .optional(),
+    // Id del comentario al que se responde (hilo). Sin esto = comentario raíz.
+    parentId: z.string().trim().min(1).max(64).optional(),
   })
   .refine(
     (v) =>
