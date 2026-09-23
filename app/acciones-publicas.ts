@@ -16,6 +16,7 @@ import {
   esquemaEncuesta,
   esquemaReporteSubida,
 } from "@/lib/seguridad";
+import { MAX_NIVELES_HILO } from "@/lib/limites";
 import type { ResPublico } from "@/lib/tipos";
 
 /**
@@ -46,7 +47,7 @@ export async function reportarErrorSubida(datos: unknown): Promise<ResPublico> {
  * - Zod valida contenido (max 250), gif/image (allowlist), audio (data URL).
  * - Cooldown de 10 s por deviceId E IP; tope de 30/hora por IP.
  * - Si el autor escribe su nombre, ese es el alias; si no, apodo estable.
- * - parentId opcional = respuesta (hilo) a un comentario raíz.
+ * - parentId opcional = respuesta (hilo) a cualquier comentario, hasta MAX_NIVELES_HILO.
  */
 export async function crearComentario(datos: unknown): Promise<ResPublico> {
   const parse = esquemaComentario.safeParse(datos);
@@ -71,15 +72,30 @@ export async function crearComentario(datos: unknown): Promise<ResPublico> {
   const data = parse.data;
   const nombre = data.nombre?.trim() ?? "";
 
-  // Hilos: solo se responde a comentarios raíz (evita anidamiento infinito).
-  let parentId: string | null = data.parentId ?? null;
+  // Hilos: se puede responder a cualquier comentario, con tope de
+// profundidad (MAX_NIVELES_HILO) para evitar anidación infinita.
+let parentId: string | null = data.parentId ?? null;
   if (parentId) {
-    const padre = await prisma.comentario.findUnique({
+    let nodo: { parentId: string | null } | null = await prisma.comentario.findUnique({
       where: { id: parentId },
       select: { parentId: true },
     });
-    if (!padre) return { ok: false, error: "El comentario al que respondes ya no existe." };
-    if (padre.parentId) return { ok: false, error: "Solo puedes responder a comentarios principales." };
+    if (!nodo) return { ok: false, error: "El comentario al que respondes ya no existe." };
+    let profundidadPadre = 0;
+    while (nodo.parentId && profundidadPadre < MAX_NIVELES_HILO) {
+      nodo = await prisma.comentario.findUnique({
+        where: { id: nodo.parentId },
+        select: { parentId: true },
+      });
+      if (!nodo) return { ok: false, error: "El comentario al que respondes ya no existe." };
+      profundidadPadre += 1;
+    }
+    if (profundidadPadre + 1 > MAX_NIVELES_HILO) {
+      return {
+        ok: false,
+        error: `Los hilos llegan hasta ${MAX_NIVELES_HILO} niveles de profundidad.`,
+      };
+    }
   }
 
   await prisma.comentario.create({

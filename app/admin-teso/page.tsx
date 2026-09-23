@@ -12,11 +12,21 @@ import { HistorialTransacciones } from "@/components/admin/historial-transaccion
 import { Resumen } from "@/components/admin/resumen";
 import { TablaAdmin } from "@/components/admin/tabla-admin";
 import { calcularDeuda } from "@/lib/deuda";
+import { COMENTARIOS_ADMIN_POR_PAGINA } from "@/lib/limites";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminTesoPage() {
+export default async function AdminTesoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ comentarios_pagina?: string }>;
+}) {
+  const { comentarios_pagina: comentariosPaginaRaw } = await searchParams;
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  const totalComentarios = await prisma.comentario.count();
+  const comentariosTotalPaginas = Math.max(1, Math.ceil(totalComentarios / COMENTARIOS_ADMIN_POR_PAGINA));
+  const comentariosPagina = Math.max(1, Math.min(Number(comentariosPaginaRaw) || 1, comentariosTotalPaginas));
 
   const [alumnos, anuncios, transacciones, ingresosMes, gastosMes, comentarios, encuestas, sugerencias, configuracion] =
     await Promise.all([
@@ -37,10 +47,12 @@ export default async function AdminTesoPage() {
       }),
       prisma.comentario.findMany({
         orderBy: { fecha: "desc" },
-        take: 100,
+        skip: (comentariosPagina - 1) * COMENTARIOS_ADMIN_POR_PAGINA,
+        take: COMENTARIOS_ADMIN_POR_PAGINA,
         include: {
           alumno: { select: { nombre: true } },
           reacciones: { select: { emoji: true, votantes: true } },
+          padre: { select: { alias: true } },
         },
       }),
       prisma.encuesta.findMany({
@@ -123,7 +135,10 @@ export default async function AdminTesoPage() {
             fecha: c.fecha,
             alumnoNombre: c.alumno?.nombre ?? null,
             reacciones: c.reacciones,
+            padreAlias: c.padre?.alias ?? null,
           }))}
+          pagina={comentariosPagina}
+          totalPaginas={comentariosTotalPaginas}
         />
 
         <GestionEncuestas

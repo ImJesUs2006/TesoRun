@@ -93,8 +93,9 @@ function FilaReacciones({ reacciones, deviceActual, comentarioId }: { reacciones
  * Tarjeta de un comentario del muro. Las imágenes se renderizan con
  * censura por defecto (blur-xl + gris) controlada en localStorage; el
  * botón "Mostrar"/"Ver imagen" la quita por imagen concreta.
- * Los comentarios raíz muestran botón "Responder" y sus respuestas se
- * pintan anidadas (margen izquierdo con borde).
+ * Cualquier comentario (raíz o respuesta) ofrece "Responder"; las
+ * respuestas se pintan anidadas (margen izquierdo con borde) hasta
+ * MAX_NIVELES_HILO de profundidad.
  */
 function RespuestaForm({
   alias,
@@ -229,15 +230,13 @@ export function ComentarioCard({
 
           <FilaReacciones reacciones={c.reacciones} deviceActual={deviceActual} comentarioId={c.id} />
 
-          {!c.parentId && (
-            <button
-              type="button"
-              onClick={() => setRespondiendo((v) => !v)}
-              className="mt-1.5 rounded-full border-2 border-black bg-white px-2.5 py-0.5 text-xs font-black text-black/60 transition hover:bg-yellow-100 active:translate-y-0.5"
-            >
-               Responder
-            </button>
-          )}
+<button
+            type="button"
+            onClick={() => setRespondiendo((v) => !v)}
+            className="mt-1.5 rounded-full border-2 border-black bg-white px-2.5 py-0.5 text-xs font-black text-black/60 transition hover:bg-yellow-100 active:translate-y-0.5"
+          >
+            💬 Responder
+          </button>
 
           {respondiendo && (
             <RespuestaForm alias={c.alias} parentId={c.id} onCerrar={() => setRespondiendo(false)} />

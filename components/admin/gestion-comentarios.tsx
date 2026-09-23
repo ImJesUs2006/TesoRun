@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, MessageSquare, Trash2 } from "lucide-react";
 import { eliminarComentario, eliminarComentariosMasivo } from "@/app/admin-teso/actions";
 import { reproducirError } from "@/lib/sound";
 import { useToast } from "./toast-provider";
-
-const POR_PAGINA = 10;
 
 export type ComentarioAdmin = {
   id: string;
@@ -17,11 +16,14 @@ export type ComentarioAdmin = {
   audioUrl: string | null;
   fecha: Date;
   alumnoNombre: string | null;
+  padreAlias: string | null;
   reacciones: Array<{ emoji: string; votantes: string[] }>;
 };
 
 type Props = {
   comentarios: ComentarioAdmin[];
+  pagina: number;
+  totalPaginas: number;
 };
 
 const formato = new Intl.DateTimeFormat("es-MX", {
@@ -31,19 +33,15 @@ const formato = new Intl.DateTimeFormat("es-MX", {
   minute: "2-digit",
 });
 
-export function GestionComentarios({ comentarios }: Props) {
+export function GestionComentarios({ comentarios, pagina, totalPaginas }: Props) {
   const { notificar } = useToast();
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
-  const [pagina, setPagina] = useState(1);
-
-  const totalPaginas = Math.max(1, Math.ceil(comentarios.length / POR_PAGINA));
-  const paginaActual = Math.min(pagina, totalPaginas);
-  const visibles = comentarios.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
 
   function irA(p: number) {
     if (p < 1 || p > totalPaginas) return;
-    setPagina(p);
+    router.push(p === 1 ? "/admin-teso" : `/admin-teso?comentarios_pagina=${p}`, { scroll: false });
   }
 
   function alternar(id: string) {
@@ -57,9 +55,9 @@ export function GestionComentarios({ comentarios }: Props) {
 
   function todos() {
     setSeleccion((prev) =>
-      visibles.every((c) => prev.has(c.id))
-        ? new Set([...prev].filter((id) => !visibles.some((v) => v.id === id)))
-        : new Set([...prev, ...visibles.map((c) => c.id)]),
+      comentarios.every((c) => prev.has(c.id))
+        ? new Set([...prev].filter((id) => !comentarios.some((v) => v.id === id)))
+        : new Set([...prev, ...comentarios.map((c) => c.id)]),
     );
   }
 
@@ -104,7 +102,7 @@ export function GestionComentarios({ comentarios }: Props) {
               onClick={todos}
               className="rounded-full border-2 border-black bg-yellow-100 px-3 py-1 text-xs font-black text-black transition hover:bg-yellow-200"
             >
-              {visibles.every((c) => seleccion.has(c.id)) ? "Limpiar selección" : "Seleccionar todo"}
+              {comentarios.every((c) => seleccion.has(c.id)) ? "Limpiar selección" : "Seleccionar todo"}
             </button>
           )}
           <span className="rounded-full border-2 border-black bg-black px-3 py-1 text-xs font-black text-white">
@@ -119,7 +117,7 @@ export function GestionComentarios({ comentarios }: Props) {
             Sin comentarios publicados.
           </li>
         )}
-        {visibles.map((c) => (
+        {comentarios.map((c) => (
           <li key={c.id} className="rounded-lg border-2 border-black bg-yellow-50 px-3 py-2">
             <div className="flex items-center gap-3">
               <label className="flex items-center">
@@ -140,6 +138,11 @@ export function GestionComentarios({ comentarios }: Props) {
                 <p className="truncate text-xs font-bold text-black/50">
                   {c.alias}{c.alumnoNombre ? ` · ex: ${c.alumnoNombre}` : ""} · {formato.format(new Date(c.fecha))}
                 </p>
+                {c.padreAlias && (
+                  <p className="truncate text-[11px] font-black text-violet-600">
+                    ↪ respuesta a {c.padreAlias}
+                  </p>
+                )}
                 {(c.gifUrl || c.imageUrl || c.audioUrl) && (
                   <p className="mt-1 flex flex-wrap items-center gap-2">
                     {c.gifUrl && (
@@ -188,19 +191,19 @@ export function GestionComentarios({ comentarios }: Props) {
         <nav className="mt-4 flex items-center justify-center gap-4" aria-label="Paginación de comentarios">
           <button
             type="button"
-            onClick={() => irA(paginaActual - 1)}
-            disabled={paginaActual <= 1}
+            onClick={() => irA(pagina - 1)}
+            disabled={pagina <= 1}
             className="inline-flex items-center gap-1 rounded-full border-4 border-black bg-white px-4 py-2 text-sm font-black text-black shadow-[4px_4px_0_0_#000] transition hover:bg-yellow-100 active:translate-x-1 active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-35"
           >
             <ArrowUp className="h-4 w-4" /> Anterior
           </button>
           <span className="rounded-full border-2 border-black bg-black px-3 py-1 text-sm font-black text-white">
-            Página {paginaActual} de {totalPaginas}
+            Página {pagina} de {totalPaginas}
           </span>
           <button
             type="button"
-            onClick={() => irA(paginaActual + 1)}
-            disabled={paginaActual >= totalPaginas}
+            onClick={() => irA(pagina + 1)}
+            disabled={pagina >= totalPaginas}
             className="inline-flex items-center gap-1 rounded-full border-4 border-black bg-white px-4 py-2 text-sm font-black text-black shadow-[4px_4px_0_0_#000] transition hover:bg-yellow-100 active:translate-x-1 active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-35"
           >
             Siguiente <ArrowDown className="h-4 w-4" />

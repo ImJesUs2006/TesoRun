@@ -19,7 +19,6 @@ import type { NotaTransaccion } from "@/lib/tipos";
 export const dynamic = "force-dynamic";
 
 const DIA_MS = 86_400_000;
-const DIAS_PURGA_COMENTARIOS = 21;
 const COMENTARIOS_POR_PAGINA = 10;
 
 export default async function HomePage({
@@ -31,11 +30,6 @@ export default async function HomePage({
   const pagina = Math.max(1, Math.min(Number(pageRaw) || 1, 9999));
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const inicioVentana = new Date(Date.now() - 12 * 7 * DIA_MS);
-
-  // Purga automática: los comentarios con más de 21 días se eliminan al consultar.
-  await prisma.comentario.deleteMany({
-    where: { fecha: { lt: new Date(Date.now() - DIAS_PURGA_COMENTARIOS * DIA_MS) } },
-  });
 
   const deviceId = (await cookies()).get(COOKIE_DEVICE)?.value ?? null;
 
@@ -63,6 +57,13 @@ export default async function HomePage({
             include: {
               alumno: { select: { nombre: true } },
               reacciones: { select: { emoji: true, votantes: true } },
+              respuestas: {
+                orderBy: { fecha: "asc" },
+                include: {
+                  alumno: { select: { nombre: true } },
+                  reacciones: { select: { emoji: true, votantes: true } },
+                },
+              },
             },
           },
         },
