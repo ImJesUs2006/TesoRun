@@ -512,6 +512,24 @@ export async function eliminarEncuesta(encuestaId: string): Promise<Resultado> {
 }
 
 /**
+ * Eliminación masiva de encuestas del muro (selección múltiple del admin).
+ */
+export async function eliminarEncuestasMasivo(ids: unknown): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+
+  const parse = esquemaIds.safeParse(ids);
+  if (!parse.success || parse.data.length === 0) {
+    return { ok: false, error: "Selecciona al menos una encuesta." };
+  }
+
+  const { count } = await prisma.encuesta.deleteMany({ where: { id: { in: parse.data } } });
+  refrescar();
+  if (count === 0) return { ok: false, error: "No se eliminó ninguna encuesta." };
+  return { ok: true };
+}
+
+/**
  * Cierra o reabre cualquier encuesta (solo admin).
  */
 export async function alternarEncuestaActiva(encuestaId: string): Promise<Resultado> {

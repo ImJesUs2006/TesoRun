@@ -37,7 +37,7 @@ export default async function AdminTesoPage() {
       }),
       prisma.comentario.findMany({
         orderBy: { fecha: "desc" },
-        take: 50,
+        take: 100,
         include: {
           alumno: { select: { nombre: true } },
           reacciones: { select: { emoji: true, votantes: true } },

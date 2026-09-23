@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { Plus, Vote, Trash2, Power } from "lucide-react";
-import { crearEncuesta, eliminarEncuesta, alternarEncuestaActiva } from "@/app/admin-teso/actions";
+import {
+  crearEncuesta,
+  eliminarEncuesta,
+  eliminarEncuestasMasivo,
+  alternarEncuestaActiva,
+} from "@/app/admin-teso/actions";
 import { reproducirError } from "@/lib/sound";
 import { useToast } from "./toast-provider";
 
@@ -32,6 +37,38 @@ export function GestionEncuestas({ encuestas }: Props) {
   const [pregunta, setPregunta] = useState("");
   const [opciones, setOpciones] = useState("");
   const [creando, setCreando] = useState(false);
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+
+  function alternarSeleccion(id: string) {
+    setSeleccion((prev) => {
+      const copia = new Set(prev);
+      if (copia.has(id)) copia.delete(id);
+      else copia.add(id);
+      return copia;
+    });
+  }
+
+  function seleccionarTodas() {
+    setSeleccion((prev) =>
+      prev.size === encuestas.length ? new Set() : new Set(encuestas.map((e) => e.id)),
+    );
+  }
+
+  function borrarMasivo() {
+    const ids = Array.from(seleccion);
+    if (ids.length === 0) return;
+    if (!window.confirm(`¿Eliminar ${ids.length} encuesta${ids.length === 1 ? "" : "s"} con sus votos?`)) return;
+    startTransition(async () => {
+      const res = await eliminarEncuestasMasivo(ids);
+      if (res.ok) {
+        notificar("Eliminación masiva", "info", `${ids.length} encuesta(s) eliminadas.`);
+        setSeleccion(new Set());
+      } else {
+        reproducirError();
+        notificar("No se pudo eliminar", "error", res.error);
+      }
+    });
+  }
 
   function crear() {
     const lista = opciones
@@ -88,9 +125,25 @@ export function GestionEncuestas({ encuestas }: Props) {
 
   return (
     <section className="rounded-xl border-4 border-black bg-white p-5 shadow-[8px_8px_0_0_#000]">
-      <h2 className="font-display mb-3 flex items-center gap-2 text-xl uppercase text-black">
-        <Vote className="h-5 w-5" /> Encuestas
-      </h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display flex items-center gap-2 text-xl uppercase text-black">
+          <Vote className="h-5 w-5" /> Encuestas
+        </h2>
+        <div className="flex items-center gap-2">
+          {encuestas.length > 0 && (
+            <button
+              type="button"
+              onClick={seleccionarTodas}
+              className="rounded-full border-2 border-black bg-yellow-100 px-3 py-1 text-xs font-black text-black transition hover:bg-yellow-200"
+            >
+              {seleccion.size === encuestas.length ? "Limpiar selección" : "Seleccionar todas"}
+            </button>
+          )}
+          <span className="rounded-full border-2 border-black bg-black px-3 py-1 text-xs font-black text-white">
+            {seleccion.size} seleccionadas
+          </span>
+        </div>
+      </div>
 
       <button
         type="button"
@@ -137,7 +190,19 @@ export function GestionEncuestas({ encuestas }: Props) {
           const total = e.opciones.reduce((acc, o) => acc + o.votos, 0);
           return (
             <li key={e.id} className="rounded-lg border-2 border-black bg-yellow-50 px-3 py-2">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <label className="mt-0.5 flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={seleccion.has(e.id)}
+                    onChange={() => alternarSeleccion(e.id)}
+                    className="h-5 w-5 rounded border-2 border-black accent-black"
+                  />
+                  <span className="sr-only">Seleccionar encuesta {e.pregunta}</span>
+                </label>
+
+                <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-bold text-black">{e.pregunta}</p>
@@ -165,30 +230,43 @@ export function GestionEncuestas({ encuestas }: Props) {
                   <p className="mt-1 text-xs font-bold text-black/40">{total} votos en total</p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => alternar(e)}
-                    disabled={pending}
-                    title={e.activa ? "Cerrar encuesta" : "Reabrir encuesta"}
-                    className="rounded-full border-2 border-black bg-white p-2 shadow-[3px_3px_0_0_#000] transition hover:bg-amber-100 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-                  >
-                    <Power className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => borrar(e)}
-                    disabled={pending}
-                    title="Eliminar encuesta"
-                    className="rounded-full border-2 border-black bg-white p-2 shadow-[3px_3px_0_0_#000] transition hover:bg-red-100 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => alternar(e)}
+                      disabled={pending}
+                      title={e.activa ? "Cerrar encuesta" : "Reabrir encuesta"}
+                      className="rounded-full border-2 border-black bg-white p-2 shadow-[3px_3px_0_0_#000] transition hover:bg-amber-100 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                    >
+                      <Power className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => borrar(e)}
+                      disabled={pending}
+                      title="Eliminar encuesta"
+                      className="rounded-full border-2 border-black bg-white p-2 shadow-[3px_3px_0_0_#000] transition hover:bg-red-100 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </li>
-          );
+            </div>
+          </li>
+        );
         })}
       </ul>
+
+      {seleccion.size > 0 && (
+        <button
+          type="button"
+          onClick={borrarMasivo}
+          disabled={pending}
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border-4 border-black bg-red-500 px-5 py-3 font-display text-white shadow-[6px_6px_0_0_#000] transition hover:-translate-y-0.5 hover:bg-red-400 active:translate-x-1 active:translate-y-1 active:shadow-none"
+        >
+          <Trash2 className="h-5 w-5" /> Eliminar {seleccion.size} seleccionadas
+        </button>
+      )}
     </section>
   );
 }
