@@ -1,24 +1,31 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowDownToLine, Banknote, Scale, Skull } from "lucide-react";
+import { ArrowDownToLine, Banknote, Landmark, Scale, Skull } from "lucide-react";
 
 type Props = {
   recaudado: number;
+  historico: number;
   gastos: number;
   morosos: number;
   alumnos: number;
 };
 
-export function Resumen({ recaudado, gastos, morosos, alumnos }: Props) {
+export function Resumen({ recaudado, historico, gastos, morosos, alumnos }: Props) {
   const saldo = recaudado - gastos;
 
   const tarjetas = [
     {
-      etiqueta: "Recaudado",
+      etiqueta: "Recaudado (mes)",
       valor: `$${recaudado}`,
       color: "bg-lime-300",
       Icono: Banknote,
+    },
+    {
+      etiqueta: "Histórico recaudado",
+      valor: `$${historico}`,
+      color: "bg-violet-300",
+      Icono: Landmark,
     },
     { etiqueta: "Gastos", valor: `$${gastos}`, color: "bg-red-300", Icono: ArrowDownToLine },
     {
@@ -31,7 +38,7 @@ export function Resumen({ recaudado, gastos, morosos, alumnos }: Props) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
       {tarjetas.map((t, i) => (
         <motion.div
           key={t.etiqueta}

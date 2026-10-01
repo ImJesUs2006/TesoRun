@@ -3,7 +3,7 @@ import { META_MENSUAL } from "@/lib/config";
 import { calcularDeuda } from "@/lib/deuda";
 import { cookies } from "next/headers";
 import { COOKIE_DEVICE } from "@/lib/seguridad";
-import { ArrowDownToLine, Banknote, CalendarDays, FileSpreadsheet, Scale } from "lucide-react";
+import { ArrowDownToLine, Banknote, CalendarDays, FileSpreadsheet, Landmark, Scale } from "lucide-react";
 import { AnunciosCinta } from "@/components/anuncios-cinta";
 import { CarruselSeBusca } from "@/components/carrusel-se-busca";
 import { ListaAlumnos } from "@/components/lista-alumnos";
@@ -33,7 +33,7 @@ export default async function HomePage({
 
   const deviceId = (await cookies()).get(COOKIE_DEVICE)?.value ?? null;
 
-  const [alumnos, anuncios, comentarios, totalComentarios, encuestas, pagos, ingresosMes, gastosMes, gastos, configuracion] =
+  const [alumnos, anuncios, comentarios, totalComentarios, encuestas, pagos, ingresosMes, historicoIngresos, gastosMes, gastos, configuracion] =
     await Promise.all([
       prisma.alumno.findMany({
         orderBy: [
@@ -81,6 +81,10 @@ export default async function HomePage({
       }),
       prisma.transaccion.aggregate({
         where: { tipo: "INGRESO", fecha: { gte: inicioMes } },
+        _sum: { monto: true },
+      }),
+      prisma.transaccion.aggregate({
+        where: { tipo: "INGRESO" },
         _sum: { monto: true },
       }),
       prisma.transaccion.aggregate({
@@ -174,6 +178,7 @@ export default async function HomePage({
   const heroes = alumnosConDeuda.filter((a) => a.deuda === 0);
   const morosos = alumnosConDeuda.filter((a) => a.deuda > 0);
   const recaudado = ingresosMes._sum.monto ?? 0;
+  const historico = historicoIngresos._sum.monto ?? 0;
   const gastosTotal = gastosMes._sum.monto ?? 0;
   const saldo = recaudado - gastosTotal;
 
@@ -198,7 +203,10 @@ export default async function HomePage({
 
         <div className="flex flex-wrap justify-center gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-black bg-lime-300 px-3 py-1 font-black text-black">
-            <Banknote className="h-4 w-4" /> Recaudado: ${recaudado}
+            <Banknote className="h-4 w-4" /> Recaudado (mes): ${recaudado}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-black bg-violet-300 px-3 py-1 font-black text-black">
+            <Landmark className="h-4 w-4" /> Histórico: ${historico}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-black bg-red-300 px-3 py-1 font-black text-black">
             <ArrowDownToLine className="h-4 w-4" /> Gastos: ${gastosTotal}
