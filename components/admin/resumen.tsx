@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowDownToLine, Banknote, Landmark, Scale, Skull } from "lucide-react";
+import { ArrowDownToLine, Landmark, Scale, Skull } from "lucide-react";
 
 type Props = {
   recaudado: number;
@@ -16,29 +16,23 @@ export function Resumen({ recaudado, historico, gastos, morosos, alumnos }: Prop
 
   const tarjetas = [
     {
-      etiqueta: "Recaudado (mes)",
-      valor: `$${recaudado}`,
-      color: "bg-lime-300",
-      Icono: Banknote,
-    },
-    {
-      etiqueta: "Histórico recaudado",
-      valor: `$${historico}`,
-      color: "bg-violet-300",
-      Icono: Landmark,
-    },
-    { etiqueta: "Gastos", valor: `$${gastos}`, color: "bg-red-300", Icono: ArrowDownToLine },
-    {
-      etiqueta: "Saldo neto",
+      etiqueta: "Saldo del mes",
       valor: `${saldo >= 0 ? "+" : ""}$${saldo}`,
       color: saldo >= 0 ? "bg-sky-300" : "bg-red-400",
       Icono: Scale,
+    },
+    { etiqueta: "Gastos (mes)", valor: `$${gastos}`, color: "bg-red-300", Icono: ArrowDownToLine },
+    {
+      etiqueta: "Histórico neto",
+      valor: `${historico >= 0 ? "" : "-"}$${Math.abs(historico)}`,
+      color: "bg-violet-300",
+      Icono: Landmark,
     },
     { etiqueta: "Morosos", valor: `${morosos}/${alumnos}`, color: "bg-orange-300", Icono: Skull },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {tarjetas.map((t, i) => (
         <motion.div
           key={t.etiqueta}

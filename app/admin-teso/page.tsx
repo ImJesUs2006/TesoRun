@@ -28,7 +28,7 @@ export default async function AdminTesoPage({
   const comentariosTotalPaginas = Math.max(1, Math.ceil(totalComentarios / COMENTARIOS_ADMIN_POR_PAGINA));
   const comentariosPagina = Math.max(1, Math.min(Number(comentariosPaginaRaw) || 1, comentariosTotalPaginas));
 
-  const [alumnos, anuncios, transacciones, ingresosMes, historicoIngresos, gastosMes, comentarios, encuestas, sugerencias, configuracion] =
+  const [alumnos, anuncios, transacciones, ingresosMes, historicoIngresos, gastosMes, historicoGastos, comentarios, encuestas, sugerencias, configuracion] =
     await Promise.all([
       prisma.alumno.findMany({ orderBy: { nombre: "asc" } }),
       prisma.anuncio.findMany({ orderBy: { fecha: "desc" }, take: 20 }),
@@ -47,6 +47,10 @@ export default async function AdminTesoPage({
       }),
       prisma.transaccion.aggregate({
         where: { tipo: "GASTO", fecha: { gte: inicioMes } },
+        _sum: { monto: true },
+      }),
+      prisma.transaccion.aggregate({
+        where: { tipo: "GASTO" },
         _sum: { monto: true },
       }),
       prisma.comentario.findMany({
@@ -69,7 +73,7 @@ export default async function AdminTesoPage({
     ]);
 
   const recaudado = ingresosMes._sum.monto ?? 0;
-  const historico = historicoIngresos._sum.monto ?? 0;
+  const historico = (historicoIngresos._sum.monto ?? 0) - (historicoGastos._sum.monto ?? 0);
   const gastos = gastosMes._sum.monto ?? 0;
 
   // Deuda en tiempo real (no se guarda en BD).
