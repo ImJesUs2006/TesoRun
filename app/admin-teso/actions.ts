@@ -579,3 +579,60 @@ export async function actualizarConfiguracion(datos: unknown): Promise<Resultado
   refrescar();
   return { ok: true };
 }
+
+/**
+ * Asigna/sobrescribe la deuda de semestres anteriores de un alumno (en pesos),
+ * sin tocar las cuotas semanales actuales ni las rachas.
+ */
+export async function asignarDeudaAnterior(alumnoId: string, monto: number): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+  if (!alumnoId || alumnoId.length > 64) return { ok: false, error: "Alumno no válido." };
+  if (!Number.isInteger(monto) || monto < 0 || monto > 1_000_000) {
+    return { ok: false, error: "Monto inválido: usa un número entero ≥ 0." };
+  }
+
+  const existe = await prisma.alumno.findUnique({ where: { id: alumnoId }, select: { id: true } });
+  if (!existe) return { ok: false, error: "Alumno no encontrado." };
+
+  await prisma.alumno.update({ where: { id: alumnoId }, data: { deudaAnterior: monto } });
+
+  refrescar();
+  return { ok: true };
+}
+
+/**
+ * Liquida la deuda de semestres anteriores de un alumno en una sola transacción:
+ * 1) deudaAnterior → 0
+ * 2) crea un INGRESO (Transaccion) por el monto de la deuda liquidada.
+ */
+export async function pagarDeudaAnterior(alumnoId: string): Promise<Resultado> {
+  const bloqueado = await exigeAdmin();
+  if (bloqueado) return bloqueado;
+  if (!alumnoId || alumnoId.length > 64) return { ok: false, error: "Alumno no válido." };
+
+  const alumno = await prisma.alumno.findUnique({
+    where: { id: alumnoId },
+    select: { id: true, deudaAnterior: true },
+  });
+  if (!alumno) return { ok: false, error: "Alumno no encontrado." };
+  if (alumno.deudaAnterior <= 0) return { ok: false, error: "No tiene deuda anterior." };
+
+  await prisma.$transaction([
+    prisma.alumno.update({
+      where: { id: alumno.id },
+      data: { deudaAnterior: 0 },
+    }),
+    prisma.transaccion.create({
+      data: {
+        monto: alumno.deudaAnterior,
+        tipo: "INGRESO",
+        descripcion: "Pago de deuda semestre anterior",
+        alumnoId: alumno.id,
+      },
+    }),
+  ]);
+
+  refrescar();
+  return { ok: true };
+}

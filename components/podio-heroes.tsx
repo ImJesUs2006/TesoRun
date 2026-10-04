@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Flame, Trophy } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Insignias } from "@/components/insignias";
+import { InsigniaDeudaAnterior } from "@/components/insignia-deuda-anterior";
 import { ModalAlumno } from "@/components/modal-alumno";
 import { CUOTA_SEMANAL } from "@/lib/config";
 import { insigniasDe } from "@/lib/badges";
@@ -70,6 +71,7 @@ export function PodioHeroes({ heroes, pagos, notas, fechaInicio }: Props) {
               <p className="max-w-full truncate text-center text-sm font-black text-black">
                 {alumno.nombre}
               </p>
+              {alumno.deudaAnterior > 0 && <InsigniaDeudaAnterior monto={alumno.deudaAnterior} />}
               <div className="flex items-center gap-1.5">
                 <span className="inline-flex items-center gap-0.5 rounded-full border-2 border-black bg-orange-300 px-2 py-0.5 text-xs font-black text-black">
                   <Flame className="h-3 w-3" /> {alumno.rachaActual}

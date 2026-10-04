@@ -16,6 +16,7 @@ model Alumno {
   rachaActual    Int            @default(0)
   mejorRacha     Int            @default(0)
   ultimoPago     DateTime?
+  deudaAnterior  Int            @default(0) // Pesos de deuda de semestres anteriores (independiente de la cuota semanal)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   transacciones  Transaccion[]

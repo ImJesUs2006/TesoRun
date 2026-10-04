@@ -4,6 +4,7 @@ import { BotonSonido } from "@/components/admin/boton-sonido";
 import { ConfigFecha } from "@/components/admin/config-fecha";
 import { ConfigLimiteEncuestas } from "@/components/admin/config-limite-encuestas";
 import { FormNuevoAlumno } from "@/components/admin/form-nuevo-alumno";
+import { FormDeudaAnterior } from "@/components/admin/form-deuda-anterior";
 import { GestionAnuncios } from "@/components/admin/gestion-anuncios";
 import { GestionComentarios } from "@/components/admin/gestion-comentarios";
 import { GestionEncuestas } from "@/components/admin/gestion-encuestas";
@@ -123,6 +124,10 @@ export default async function AdminTesoPage({
         <ConfigFecha fechaInicio={configuracion?.fechaInicio ?? null} />
 
         <ConfigLimiteEncuestas maxEncuestasDiarias={configuracion?.maxEncuestasDiarias ?? 5} />
+
+        <FormDeudaAnterior
+          alumnos={alumnos.map((a) => ({ id: a.id, nombre: a.nombre }))}
+        />
 
         <GestionAnuncios
           anuncios={anuncios.map((a) => ({

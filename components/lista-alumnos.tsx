@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Users } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Insignias } from "@/components/insignias";
+import { InsigniaDeudaAnterior } from "@/components/insignia-deuda-anterior";
 import { ModalAlumno } from "@/components/modal-alumno";
 import { CUOTA_SEMANAL } from "@/lib/config";
 import { insigniasDe } from "@/lib/badges";
@@ -63,6 +64,7 @@ export function ListaAlumnos({ alumnos, pagos, notas, fechaInicio }: Props) {
                       ? `Debe ${a.deuda} sem · $${a.deuda * CUOTA_SEMANAL}`
                       : "Al día"}
                   </span>
+                  {a.deudaAnterior > 0 && <InsigniaDeudaAnterior monto={a.deudaAnterior} />}
                   <Insignias insignias={insignias} />
                 </div>
               </motion.div>

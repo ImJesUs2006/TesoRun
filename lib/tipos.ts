@@ -4,6 +4,7 @@ export type AlumnoPublico = {
   avatarUrl: string | null;
   semanasPagadas: number;
   deuda: number;
+  deudaAnterior: number;
   rachaActual: number;
   mejorRacha: number;
 };

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Search, Trash2, Upload } from "lucide-react";
+import { HandCoins, Search, Trash2, Upload } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { CUOTA_SEMANAL } from "@/lib/config";
-import { actualizarAlumno, eliminarAlumno } from "@/app/admin-teso/actions";
+import { actualizarAlumno, eliminarAlumno, pagarDeudaAnterior } from "@/app/admin-teso/actions";
 import { reproducirError } from "@/lib/sound";
 import { BotonDeshacer, BotonPago } from "./boton-pago";
 import { useToast } from "./toast-provider";
@@ -15,6 +15,7 @@ export type AlumnoAdmin = {
   avatarUrl: string | null;
   semanasPagadas: number;
   deuda: number;
+  deudaAnterior: number;
   rachaActual: number;
   mejorRacha: number;
 };
@@ -158,6 +159,17 @@ function AlumnoFila({ alumno }: { alumno: AlumnoAdmin }) {
     });
   }
 
+  function liquidarAnterior() {
+    startTransition(async () => {
+      const res = await pagarDeudaAnterior(alumno.id);
+      if (res.ok) notificar("Deuda anterior liquidada", "ok", `$${alumno.deudaAnterior}`);
+      else {
+        reproducirError();
+        notificar("No se liquidó", "error", res.error);
+      }
+    });
+  }
+
   return (
     <tr className="border-t-2 border-black transition-colors hover:bg-yellow-50">
       <td className="px-4 py-3">
@@ -212,18 +224,31 @@ function AlumnoFila({ alumno }: { alumno: AlumnoAdmin }) {
         </label>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center justify-center gap-2">
-          <BotonPago alumnoId={alumno.id} nombre={alumno.nombre} bloqueado={alumno.deuda === 0} />
-          <BotonDeshacer alumnoId={alumno.id} />
-          <button
-            type="button"
-            onClick={borrar}
-            disabled={pending}
-            title={`Eliminar a ${alumno.nombre}`}
-            className="rounded-full border-4 border-black bg-white p-2.5 shadow-[4px_4px_0_0_#000] transition hover:-translate-y-0.5 hover:bg-red-100 active:translate-x-1 active:translate-y-1 active:shadow-none disabled:opacity-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+        <div className="flex flex-col items-center gap-2">
+          {alumno.deudaAnterior > 0 && (
+            <button
+              type="button"
+              onClick={liquidarAnterior}
+              disabled={pending}
+              title={`Liquidar deuda de ${alumno.nombre}`}
+              className="inline-flex items-center gap-1.5 rounded-full border-4 border-black bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-[3px_3px_0_0_#000] transition hover:-translate-y-0.5 hover:bg-red-400 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:opacity-50"
+            >
+              <HandCoins className="h-3.5 w-3.5" /> Liquidar deuda anterior (${alumno.deudaAnterior})
+            </button>
+          )}
+          <div className="flex items-center justify-center gap-2">
+            <BotonPago alumnoId={alumno.id} nombre={alumno.nombre} bloqueado={alumno.deuda === 0} />
+            <BotonDeshacer alumnoId={alumno.id} />
+            <button
+              type="button"
+              onClick={borrar}
+              disabled={pending}
+              title={`Eliminar a ${alumno.nombre}`}
+              className="rounded-full border-4 border-black bg-white p-2.5 shadow-[4px_4px_0_0_#000] transition hover:-translate-y-0.5 hover:bg-red-100 active:translate-x-1 active:translate-y-1 active:shadow-none disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </td>
     </tr>

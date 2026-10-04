@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Megaphone, Search } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Insignias } from "@/components/insignias";
+import { InsigniaDeudaAnterior } from "@/components/insignia-deuda-anterior";
 import { ModalAlumno } from "@/components/modal-alumno";
 import { CUOTA_SEMANAL } from "@/lib/config";
 import { insigniasDe } from "@/lib/badges";
@@ -140,6 +141,12 @@ export function CarruselSeBusca({ buscados, pagos, notas, fechaInicio }: Props) 
                 <p className="mt-1 rounded-md border-2 border-black bg-red-500 px-2 py-0.5 text-center text-sm font-black text-white">
                   Deuda: ${alumno.deuda * CUOTA_SEMANAL}
                 </p>
+
+                {alumno.deudaAnterior > 0 && (
+                  <div className="mt-2">
+                    <InsigniaDeudaAnterior monto={alumno.deudaAnterior} />
+                  </div>
+                )}
 
                 <div className="mt-2">
                   <Insignias insignias={insigniasDe(alumno)} max={2} />
