@@ -235,7 +235,7 @@ export function ComentarioCard({
             onClick={() => setRespondiendo((v) => !v)}
             className="mt-1.5 rounded-full border-2 border-black bg-white px-2.5 py-0.5 text-xs font-black text-black/60 transition hover:bg-yellow-100 active:translate-y-0.5"
           >
-            💬 Responder
+            Responder
           </button>
 
           {respondiendo && (
